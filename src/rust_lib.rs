@@ -263,6 +263,71 @@ pub mod main_mod {
         let versub = versub.unwrap();
         return versub.to_string();
     }
+    /**
+     * 获取exe的位数（32位或64位）
+     */
+    pub fn get_file_bit(file: String) -> Option<bool> {
+        let path = std::path::Path::new(file.as_str());
+        if !path.exists() || path.exists() && path.is_dir() {
+            return None;
+        }
+        let data = pelite::FileMap::open(path);
+        if let Err(_) = data {
+            return None;
+        }
+        let data = data.unwrap();
+        let file = pelite::PeFile::from_bytes(&data);
+        if let Err(_) = file {
+            return None;
+        }
+        let file = file.unwrap();
+        match file {
+            pelite::Wrap::T64(_) => {
+                return Some(true);
+            }
+            pelite::Wrap::T32(_) => {
+                return Some(false);
+            }
+        }
+    }
+    /**
+     * 获取exe文件的版本号
+     */
+    pub fn get_file_version(file: String) -> Option<String> {
+        let path = std::path::Path::new(file.as_str());
+        if !path.exists() || path.exists() && path.is_dir() {
+            return None;
+        }
+        let data = pelite::FileMap::open(path);
+        if let Err(_) = data {
+            return None;
+        }
+        let data = data.unwrap();
+        let file = pelite::PeFile::from_bytes(&data);
+        if let Err(_) = file {
+            return None;
+        }
+        let file = file.unwrap();
+        let file = file.resources();
+        if let Err(_) = file {
+            return None;
+        }
+        let fixed_version = file.unwrap().version_info();
+        if let Err(_) = fixed_version {
+            return None;
+        }
+        let fixed_version = fixed_version.unwrap().fixed();
+        if let None = fixed_version {
+            return None;
+        }
+        let fixed_version = fixed_version.unwrap();
+        return Some(format!("{}.{}.{}.{}", 
+                    fixed_version.dwFileVersion.Major.to_string(),
+                    fixed_version.dwFileVersion.Minor.to_string(),
+                    fixed_version.dwFileVersion.Build.to_string(),
+                    fixed_version.dwFileVersion.Patch.to_string()
+                ));
+    }
 }
 /**
  * 专注于启动游戏的模块，所有启动游戏的函数都可以在这里面找到！
@@ -619,7 +684,7 @@ pub mod launcher_mod {
                 if pa.is_dir() { continue; }
                 let ps = pa.display().to_string();
                 if ps.contains(suffix) {
-                    return if suffix.eq(".json") && ps[(ps.len() - 5)..ps.len()].eq(".json") {
+                    return if suffix.eq(".json") {
                         let file_content = super::main_mod::get_file(ps.as_str());
                         if let None = file_content { continue; }
                         let file_content = file_content.unwrap();
@@ -644,7 +709,7 @@ pub mod launcher_mod {
                         Some(ps)
                     } else {
                         Some(ps)
-                    }
+                    };
                 }else if !suffix.contains(".") {
                     let sha = super::main_mod::get_sha1(ps.as_str());
                     if let None = sha { continue; }
@@ -956,7 +1021,7 @@ pub mod launcher_mod {
      * root_path里面包含【assets、libraries】两个文件夹
      * version_path里面包含【版本.json、版本.jar】两个文件
      * 后期解压Native是默认解压到version_path路径下的！
-     * @param account: 账号类，参见AccountLogin。
+     * @param account: 账号类，参见LaunchAccount。
      * @param java_path: Java路径
      * @param root_path: MC根路径（用于查询assets、libraries）
      * @param version_path: MC版本路径（用于查询MC元数据JSON和本体jar）
@@ -970,7 +1035,7 @@ pub mod launcher_mod {
      * @param pre_launch_script: 启动前执行脚本
      */
     pub struct LaunchOption{
-        account: AccountLogin,
+        account: LaunchAccount,
         java_path: String,
         root_path: String,
         version_path: String,
@@ -984,7 +1049,7 @@ pub mod launcher_mod {
         additional_game: String,
     }
     impl LaunchOption {
-        pub fn new(account: AccountLogin, java_path: &str, root_path: &str, version_path: &str, game_path: &str) -> Self {
+        pub fn new(account: LaunchAccount, java_path: &str, root_path: &str, version_path: &str, game_path: &str) -> Self {
             Self {
                 account,
                 java_path: java_path.to_string(),
@@ -1021,7 +1086,7 @@ pub mod launcher_mod {
         pub fn set_additional_game(&mut self, additional_game: &str) {
             self.additional_game = additional_game.to_string();
         }
-        pub fn get_account(&self) -> AccountLogin {
+        pub fn get_account(&self) -> LaunchAccount {
             self.account.clone()
         }
         pub fn get_java_path(&self) -> &str {
@@ -1059,7 +1124,7 @@ pub mod launcher_mod {
         }
     }
     pub struct LaunchGame {
-        account: AccountLogin,
+        account: LaunchAccount,
         java_path: String,
         root_path: String,
         version_path: String,
@@ -1081,7 +1146,6 @@ pub mod launcher_mod {
         fn new<F>(option: LaunchOption, callback: F) -> Self 
         where
             F: Fn(Vec<&str>) + 'static
-        // fn new<F: Fn(String) + 'static>(option: LaunchOption, callback: F) -> Self 
         {
             Self {
                 account: option.get_account(),
@@ -1169,7 +1233,7 @@ pub mod launcher_mod {
                     return Err(ERR_LAUNCH_ACCOUNT_ACCESS_TOKEN);
                 }
             } else if self.account.get_online() == 2 {
-                if self.account.get_base().is_empty() {
+                if self.account.get_base().is_empty() || !regex::Regex::new(r"^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$").unwrap().is_match(self.account.get_base()) {
                     return Err(ERR_LAUNCH_ACCOUNT_THIRDPARTY_BASE);
                 }
                 let t = format!("{}/authserver/validate", self.account.get_url());
@@ -1287,7 +1351,7 @@ pub mod launcher_mod {
                     }
                 }
             }
-            result.push(format!("-Xmx{}m", self.min_memory));
+            result.push(format!("-Xmn{}m", self.min_memory));
             result.push(format!("-Xmx{}m", self.max_memory));
             //下列拼接game参数
             let main_class = root.get("mainClass");
@@ -1422,7 +1486,7 @@ pub mod launcher_mod {
                     }
                 }
             }
-            result.push(format!("-Xmx{}m", self.min_memory));
+            result.push(format!("-Xmn{}m", self.min_memory));
             result.push(format!("-Xmx{}m", self.max_memory));
             let main_class = root.get("mainClass");
             if let None = main_class { return None; }
@@ -1481,7 +1545,7 @@ pub mod launcher_mod {
          * 如果没有错误，则会调用该函数。如果启动过程中出现不可预知的错误，则会直接panic掉！
          */
         fn game_launch(&self) {
-            let def_jvm: String = String::from("-XX:+UseG1GC -XX:-UseAdaptiveSizePolicy -XX:-OmitStackTraceInFastThrow -Dfml.ignoreInvalidMinecraftCertificates=True -Dfml.ignorePatchDiscrepancies=True -Dlog4j2.formatMsgNoLookups=true");
+            let def_jvm: String = String::from("-XX:+UseG1GC -XX:-UseAdaptiveSizePolicy -XX:-OmitStackTraceInFastThrow -Dfml.ignoreInvalidMinecraftCertificates=True -Dfml.ignorePatchDiscrepancies=True -Dlog4j2.formatMsgNoLookups=True");
             let defn_jvm: String = String::from("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump");
             let version_json_path = get_mc_real_path(self.version_path.clone(), ".json");
             if let None = version_json_path {
@@ -1551,23 +1615,23 @@ pub mod launcher_mod {
      * @param online: 仅用于标记目前你使用的哪种方式登录，不作为默认参数提供。
      * 
      * 
-     * 离线模式调用示例：AccountLogin::new_offline("Steve", "1234567890abcdef1234567890abcdef");
-     * 或：AccountLogin::new_offline_default("Steve");  // UUID会自动按照bukkit方式生成。
-     * 微软登录调用示例：AccountLogin::new_microsoft("Steve", "1234567890abcdef1234567890abcdef", "<你的access token密钥>")
-     * 第三方外置登录调用示例：AccountLogin::new_thirdparty(
+     * 离线模式调用示例：LaunchAccount::new_offline("Steve", "1234567890abcdef1234567890abcdef");
+     * 或：LaunchAccount::new_offline_default("Steve");  // UUID会自动按照bukkit方式生成。
+     * 微软登录调用示例：LaunchAccount::new_microsoft("Steve", "1234567890abcdef1234567890abcdef", "<你的access token密钥>")
+     * 第三方外置登录调用示例：LaunchAccount::new_thirdparty(
      *                      "Steve", 
      *                      "1234567890abcdef1234567890abcdef", 
      *                      "<你的access token密钥>", 
      *                      "<你的皮肤站元数据base64编码>", 
      *                      "https://littleskin.cn/api/yggdrasil"")  # 皮肤站元数据必须得是精确到api/yggdrasil的！
-     * 或：AccountLogin::new_thirdparty(
+     * 或：LaunchAccount::new_thirdparty(
      *                      "Steve", 
      *                      "1234567890abcdef1234567890abcdef", 
      *                      "<你的access token密钥>", 
      *                      "https://littleskin.cn/api/yggdrasil"")  # 此时皮肤站元数据base64编码会自动从api密钥获取。
-     */ 
+     */
     #[derive(Clone)]
-    pub struct AccountLogin{
+    pub struct LaunchAccount{
         name: String,
         uuid: String,
         access_token: String,
@@ -1576,7 +1640,7 @@ pub mod launcher_mod {
         url: String,
         online: i32,
     }
-    impl AccountLogin{
+    impl LaunchAccount{
         fn new(name: String, uuid: String, access_token: String, atype: String, base: String, url: String, online: i32) -> Self {
             Self {
                 name: name.clone(),
@@ -1589,54 +1653,54 @@ pub mod launcher_mod {
             }
         }
         pub fn new_offline(name: &str, uuid: &str) -> Self{
-            AccountLogin::new(
-                name.to_string(), 
-                uuid.to_string(), 
-                uuid.to_string(), 
-                String::from("Legacy"), 
-                String::new(), 
-                String::new(), 
+            LaunchAccount::new(
+                name.to_string(),
+                uuid.to_string(),
+                uuid.to_string(),
+                String::from("Legacy"),
+                String::new(),
+                String::new(),
                 0)
         }
         pub fn new_offline_default(name: &str) -> Self {
             let uuid = super::main_mod::generate_bukkit_uuid(name);
-            AccountLogin::new(
-                name.to_string(), 
-                uuid.clone(), 
-                uuid.clone(), 
-                String::from("Legacy"), 
-                String::new(), 
-                String::new(), 
+            LaunchAccount::new(
+                name.to_string(),
+                uuid.clone(),
+                uuid.clone(),
+                String::from("Legacy"),
+                String::new(),
+                String::new(),
                 0)
         }
         pub fn new_microsoft(name: &str, uuid: &str, access_token: &str) -> Self{
-            AccountLogin::new(
-                name.to_string(), 
-                uuid.to_string(), 
-                access_token.to_string(), 
-                String::from("msa"), 
-                String::new(), 
-                String::new(), 
+            LaunchAccount::new(
+                name.to_string(),
+                uuid.to_string(),
+                access_token.to_string(),
+                String::from("msa"),
+                String::new(),
+                String::new(),
                 1)
         }
         pub fn new_thirdparty(name: &str, uuid: &str, access_token: &str, base: &str, url: &str) -> Self{
-            AccountLogin::new(
-                name.to_string(), 
-                uuid.to_string(), 
-                access_token.to_string(), 
-                String::from("msa"), 
-                base.to_string(), 
-                url.to_string(), 
+            LaunchAccount::new(
+                name.to_string(),
+                uuid.to_string(),
+                access_token.to_string(),
+                String::from("msa"),
+                base.to_string(),
+                url.to_string(),
                 2)
         }
         pub fn new_thirdparty_default(name: &str, uuid: &str, access_token: &str, url: &str) -> Self {
-            AccountLogin::new(
-                name.to_string(), 
-                uuid.to_string(), 
-                access_token.to_string(), 
-                String::from("msa"), 
-                super::main_mod::generate_thirdparty_metadata_base64(url), 
-                url.to_string(), 
+            LaunchAccount::new(
+                name.to_string(),
+                uuid.to_string(),
+                access_token.to_string(),
+                String::from("msa"),
+                super::main_mod::generate_thirdparty_metadata_base64(url),
+                url.to_string(),
                 2)
         }
         pub fn get_name(&self) -> &str {
@@ -1657,7 +1721,7 @@ pub mod launcher_mod {
         pub fn get_url(&self) -> &str {
             self.url.as_str()
         }
-        pub fn get_online(&self) -> i32 {
+        fn get_online(&self) -> i32 {
             self.online
         }
     }

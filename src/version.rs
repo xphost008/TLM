@@ -17,23 +17,25 @@ pub fn set_isolation() {
     std::io::stdin().read_line(&mut input_num).expect("Cannot read int!");
     let input_num = input_num.trim().parse::<i32>();
     if let Err(_) = input_num {
-        println!("输入了不正确的数字！");
+        println!("{}", ansi_term::Color::Red.paint("输入了不正确的数字！"));
         return;
     }
     let input_num = input_num.unwrap();
     if input_num < 1 || input_num > 4 {
-        println!("输入了不正确的数字！");
+        println!("{}", ansi_term::Color::Red.paint("输入了不正确的数字！"));
         return;
     }
-    unsafe { IS_ISOLATION = input_num; }
-    save_version();
-    println!("设置完成！");
+    unsafe { 
+        IS_ISOLATION = input_num; 
+        crate::main_method::TLM_INI.write_str("Version", "SelectIsolation", IS_ISOLATION.to_string().as_str());
+    }
+    println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 pub fn check_version() {
     unsafe {
         println!("当前全局设置为：");
         if CHOOSE_VERSION < 0 {
-            println!("你还暂未选择任一文件列表！");
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任一文件列表！"));
         }else{
             let p = VERSION_JSON
                     .as_object()
@@ -54,7 +56,7 @@ pub fn check_version() {
                     .expect("JSON Parse Error!");
             println!("\n你当前选中的文件列表是：\n名称：{}\n路径：{}", ne, ph);
             if CHOOSE_VERSION_SEL < 0 {
-                println!("你还暂未选择任一游戏版本！");
+                println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任一游戏版本！"));
             }else{
                 let p = VERSION_SEL_JSON
                         .as_object()
@@ -96,7 +98,7 @@ pub fn choose_version() {
             res.push(format!("{}. {}", i + 1, p));
         }
         if res.len() == 0 {
-            println!("你还暂未选择任意文件夹哦！请选择一个再来！");
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任意文件夹哦！请选择一个再来！"));
             return;
         }
         println!("----------------------------------------------");
@@ -109,24 +111,20 @@ pub fn choose_version() {
         std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
         let input_num = input_num.trim().parse::<usize>();
         if let Err(_) = input_num {
-            println!("输入了错误的数字，请重新输入！1");
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
             return;
         }
         let input_num = input_num.unwrap();
-        if input_num > ver_obj.len() || input_num < 1 {
-            println!("输入了错误的数字，请重新输入！2");
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
             return;
         }
         let input_num = input_num - 1;
-        if !crate::main_method::TLM_INI.write_str("MC", "SelectVer", input_num.to_string().as_str()) {
-            println!("写出INI文件失败，请重试！");
-            return;
-        }
+        crate::main_method::TLM_INI.write_str("MC", "SelectVer", input_num.to_string().as_str());
         CHOOSE_VERSION_SEL = input_num as i32;
         CURRENT_VERSION_SEL = ver_obj[input_num].get("path").unwrap().to_string();
     }
-    save_version();
-    println!("设置完成！");
+    println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 pub fn choose_root() {
     unsafe {
@@ -142,7 +140,7 @@ pub fn choose_root() {
             res.push(format!("{}. {} - {}", i + 1, n, p));
         }
         if res.len() == 0 {
-            println!("你还暂未添加任意文件夹哦！请添加一个再来！");
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未添加任意文件夹哦！请添加一个再来！"));
             return;
         }
         println!("----------------------------------------------");
@@ -155,19 +153,16 @@ pub fn choose_root() {
         std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
         let input_num = input_num.trim().parse::<usize>();
         if let Err(_) = input_num {
-            println!("输入了错误的数字，请重新输入！1");
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
             return;
         }
         let input_num = input_num.unwrap();
-        if input_num > ver_obj.len() || input_num < 1 {
-            println!("输入了错误的数字，请重新输入！2");
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
             return;
         }
         let input_num = input_num - 1;
-        if !crate::main_method::TLM_INI.write_str("MC", "SelectMC", input_num.to_string().as_str()) {
-            println!("写出INI文件失败，请重试！");
-            return;
-        }
+        crate::main_method::TLM_INI.write_str("MC", "SelectMC", input_num.to_string().as_str());
         CHOOSE_VERSION = input_num as i32;
         let act_ver = ver_obj[input_num].clone();
         let act_ver = act_ver.get("path").expect("JSON Parse Error!");
@@ -188,7 +183,7 @@ pub fn choose_root() {
         CURRENT_VERSION = act_ver.clone();
     }
     save_version();
-    println!("设置完成！");
+    println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 pub fn add_directory() {
     println!("请输入mc根路径，或者将文件夹拖入以自动填写路径：");
@@ -199,10 +194,9 @@ pub fn add_directory() {
     let mut input_name = String::new();
     std::io::stdin().read_line(&mut input_name).expect("Cannot read stdin!");
     input_name = input_name.trim().to_string();
-    let binding_dir = input_dir.clone();
-    let path = std::path::Path::new(binding_dir.as_str());
+    let path = std::path::Path::new(input_dir.as_str());
     if !path.exists() || path.exists() && path.is_file() {
-        println!("路径输入错误，请不要输入不存在的路径！");
+        println!("{}", ansi_term::Color::Red.paint("你输入的文件夹不存在，请重新输入！"));
         return;
     }
     unsafe {
@@ -216,7 +210,7 @@ pub fn add_directory() {
         ver_obj.push(serde_json::Value::Object(push_obj.clone()));
     }
     save_version();
-    println!("添加完成！")
+    println!("{}", ansi_term::Color::Green.paint("添加成功！"));
 }
 pub fn save_version() {
     unsafe {
@@ -226,8 +220,5 @@ pub fn save_version() {
         crate::rust_lib::main_mod::set_file(
             format!("{}\\TankLauncherModule\\configs\\MCSelJSON.json", crate::main_method::CURRENT_DIR).as_str(), 
             serde_json::to_string_pretty(&VERSION_SEL_JSON.clone()).unwrap());
-        if !crate::main_method::TLM_INI.write_str("Version", "SelectIsolation", IS_ISOLATION.to_string().as_str()) {
-            panic!("Write str to TankLauncherModule.ini is error in isolation!");
-        }
     }
 }
