@@ -1,3 +1,5 @@
+use version::CURRENT_VERSION_SEL;
+
 mod rust_lib;
 mod launcher;
 mod main_method;
@@ -61,8 +63,10 @@ fn show_launch() {
     println!("|        6. 选择Java                         |");
     println!("|        7. 下载Java                         |");
     println!("|        8. 扫描Java                         |");
-    println!("|        9. 设置额外JVM参数                  |");
-    println!("|        10. 设置额外Game参数                |");
+    println!("|        9. 移除Java                         |");
+    println!("|        10. 设置自定义信息                  |");
+    println!("|        11. 设置额外JVM参数                 |");
+    println!("|        12. 设置额外Game参数                |");
     println!("|        q. 退出当前页                       |");
     println!("----------------------------------------------");
 }
@@ -110,21 +114,24 @@ fn outout_launch() {
                     println!("暂未实现！");
                 }
                 8 => {
-                    println!("暂未实现！");
+                    launch::do_scan_java();
                 }
                 9 => {
-                    println!("暂未实现！");
+                    launch::remove_java();
                 }
                 10 => {
-                    println!("暂未实现！");
+                    launch::set_custom_info();
                 }
                 11 => {
-                    println!("暂未实现！");
+                    launch::set_additional_jvm();
                 }
-                _ => println!("{}", ansi_term::Color::Green.paint("请不要输入0-11以外的数字噢！")),
+                12 => {
+                    launch::set_additional_game();
+                }
+                _ => println!("{}", ansi_term::Color::Red.paint("请不要输入0-11以外的数字噢！")),
             }
         }else{
-            println!("{}", ansi_term::Color::Green.paint("请不要输入数字以外的字符噢！"));
+            println!("{}", ansi_term::Color::Red.paint("请不要输入数字以外的字符噢！"));
         }
     }
 }
@@ -163,16 +170,16 @@ fn output_version() {
                     println!("暂未实现！");
                 }
                 6 => {
-                    println!("暂未实现！");
+                    version::rename_root();
                 }
                 7 => {
-                    println!("暂未实现！");
+                    version::remove_root();
                 }
                 8 => {
-                    println!("暂未实现！");
+                    version::rename_version();
                 }
                 9 => {
-                    println!("暂未实现！");
+                    version::remove_version();
                 }
                 10 => {
                     println!("暂未实现！");
@@ -180,10 +187,10 @@ fn output_version() {
                 11 => {
                     println!("暂未实现！");
                 }
-                _ => println!("{}", ansi_term::Color::Green.paint("请不要输入0-11以外的数字噢！")),
+                _ => println!("{}", ansi_term::Color::Red.paint("请不要输入0-11以外的数字噢！")),
             }
         }else{
-            println!("{}", ansi_term::Color::Green.paint("请不要输入数字以外的字符噢！"));
+            println!("{}", ansi_term::Color::Red.paint("请不要输入数字以外的字符噢！"));
         }
     }
 }
@@ -327,9 +334,11 @@ fn launch_game(){
 }
 
 fn test() {
-    let v = rust_lib::main_mod::get_file_bit(r"D:\Workspace\DelphiWork\DelphiWorkReset\LittleLimboLauncher\Win64\Release\LittleLimboLauncher.exe".to_string());
-    println!("{:?}", v);
-    println!("{}", true.to_string());
+    // let f = std::fs::remove_dir_all("D:\\testdir");
+    // let f = std::fs::rename("D:\\testdir", "D:\\testdirr");
+    // if let Err(e) = f {
+    //     println!("{:?}", e);
+    // }
 }
 fn command_judge_launch(a: Vec<String>) {
     let mut root_dir = String::new();
@@ -418,14 +427,14 @@ fn command_judge_launch(a: Vec<String>) {
         } else {
             root_dir
         };
-        if version.is_empty() {
+        version = format!("{}\\versions\\{}", root_dir.clone(), if version.is_empty() {
             if version::CHOOSE_VERSION_SEL < 0 {
-                panic!("game dir param cannot be empty!");
+                panic!("version name param cannot be empty!");
             }
-            version = version::CURRENT_VERSION_SEL.clone();
+            CURRENT_VERSION_SEL.clone()
         } else {
-            version = format!("{}\\versions\\{}", root_dir, version);
-        }
+            version
+        });
         let game_dir = if isolation.eq("true") { version.clone() } else if isolation.eq("false") { root_dir.clone() } else {
             launcher::is_isolation(root_dir.clone(), version.clone()).clone()
         };
@@ -447,9 +456,9 @@ fn command_judge_launch(a: Vec<String>) {
         window_height = if window_height == 0 { launch::WINDOW_HEIGHT } else { window_height };
         min_memory = if min_memory == 0 { launch::MIN_MEMORY } else { min_memory };
         max_memory = if max_memory == 0 { launch::MAX_MEMORY } else { max_memory };
-        custom_info = if custom_info.is_empty() { "Tank Launcher Module".to_string() } else { custom_info.clone() };
-        additional_jvm = if additional_jvm.is_empty() { String::new() } else { additional_jvm.clone() };
-        additional_game = if additional_game.is_empty() { String::new() } else { additional_game.clone() };
+        custom_info = if custom_info.is_empty() { launch::CUSTOM_INFO.clone() } else { custom_info.clone() };
+        additional_jvm = if additional_jvm.is_empty() { launch::ADDITIONAL_JVM.clone() } else { additional_jvm.clone() };
+        additional_game = if additional_game.is_empty() { launch::ADDITIONAL_GAME.clone() } else { additional_game.clone() };
         let account = rust_lib::launcher_mod::LaunchAccount::new_offline(account_user_name.as_str(), account_user_uuid.as_str());
         let mut option = rust_lib::launcher_mod::LaunchOption::new(
                 account, 
@@ -522,6 +531,7 @@ fn unsafe_init() {
             }
             version::VERSION_SEL_JSON = serde_json::Value::Object(ver.clone());
         }
+        version::reload_version();
         let java_path = config_path.join("JavaJSON.json");
         if !java_path.exists() {
             let java = serde_json::from_str::<serde_json::Value>("{\"java\":[]}").unwrap();
@@ -573,6 +583,12 @@ fn unsafe_init() {
             panic!("Max Memory is error!");
         }
         launch::MAX_MEMORY = xm as usize;
+        launch::CUSTOM_INFO = main_method::TLM_INI.read_str("Version", "CustomInfo", "");
+        if launch::CUSTOM_INFO.is_empty() {
+            launch::CUSTOM_INFO = String::from("Tank Launcher Module");
+        }
+        launch::ADDITIONAL_JVM = main_method::TLM_INI.read_str("Version", "AdditionalJVM", "");
+        launch::ADDITIONAL_GAME = main_method::TLM_INI.read_str("Version", "AdditionalGame", "");
     }
 }
 fn tank_launcher_module_test_main(){
@@ -648,10 +664,10 @@ fn tank_launcher_module_test_main(){
                 10 => {
                     println!("暂未实现！");
                 }
-                _ => println!("{}", ansi_term::Color::Green.paint("请不要输入0-10以外的数字噢！")),
+                _ => println!("{}", ansi_term::Color::Red.paint("请不要输入0-10以外的数字噢！")),
             }
         }else{
-            println!("{}", ansi_term::Color::Green.paint("请不要输入数字以外的字符噢！"));
+            println!("{}", ansi_term::Color::Red.paint("请不要输入数字以外的字符噢！"));
         }
     }
 }

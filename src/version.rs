@@ -70,7 +70,7 @@ pub fn check_version() {
                         .expect("JSON Parse Error!")
                         .as_str()
                         .expect("JSON Parse Error!");
-                println!("\n你当前选中的游戏版本路径是：\n{}", ph);
+                println!("\n你当前选中的游戏版本是：\n{}", ph);
             }
         }
         println!("\n当前全局版本隔离为：{}", if IS_ISOLATION == 1 { 
@@ -85,7 +85,135 @@ pub fn check_version() {
         println!("当前你选中的版本独立设置为：");
     }
 }
-pub fn choose_version() {
+pub fn reload_version() {
+    unsafe {
+        if CHOOSE_VERSION < 0 { return; }
+        let ver_root = VERSION_SEL_JSON.get_mut("mcsel").expect("Cannot get mcsel!").as_array_mut().expect("Cannot get mcsel");
+        ver_root.clear();
+        let mc_root = VERSION_JSON.as_object().unwrap();
+        let path = mc_root
+                .get("mc")
+                .expect("Cannot get mc path pairs!")
+                .get(CHOOSE_VERSION as usize)
+                .expect("Cannot get mc path pairs!")
+                .get("path")
+                .expect("Cannot get mc path pairs!")
+                .as_str()
+                .expect("Cannot get mc path pairs!");
+        let ver = format!("{}\\versions", path);
+        let path = std::path::Path::new(ver.as_str());
+        if !path.exists() || path.exists() && path.is_file() { return; }
+        let walk = walkdir::WalkDir::new(path).min_depth(1).max_depth(1);
+        for i in walk.into_iter().filter_map(|e| e.ok()) {
+            // TODD: 判断版本是否有误！
+            let ccf = i.file_name().to_str().unwrap().to_string();
+            let mut p_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
+            let p_obj = p_obj.as_object_mut().unwrap();
+            p_obj.insert(String::from("path"), serde_json::Value::String(ccf.clone()));
+            ver_root.push(serde_json::Value::Object(p_obj.clone()));
+        }
+    }
+}
+pub fn rename_root() {
+    unsafe {
+        let ver_obj = VERSION_JSON.get_mut("mc").expect("JSON Parse Error!");
+        let ver_obj = ver_obj.as_array_mut().expect("JSON Parse Error!");
+        let mut res: Vec<String> = Vec::new();
+        for i in 0..ver_obj.len() {
+            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
+            let n = j.get("name").expect("JSON Parse Error!");
+            let p = j.get("path").expect("JSON Parse Error!");
+            let n = n.as_str().expect("JSON Parse Error!");
+            let p = p.as_str().expect("JSON Parse Error!");
+            res.push(format!("{}. {} - {}", i + 1, n, p));
+        }
+        if res.len() == 0 {
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未添加任意文件夹哦！请添加一个再来！"));
+            return;
+        }
+        println!("----------------------------------------------");
+        println!("请输入你要重命名的文件列表：");
+        for i in res.iter() {
+            println!("{}", i);
+        }
+        println!("----------------------------------------------");
+        let mut input_num = String::new();
+        std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+        let input_num = input_num.trim().parse::<usize>();
+        if let Err(_) = input_num {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num.unwrap();
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num - 1;
+        println!("请输入要修改的名称：");
+        let mut input_str = String::new();
+        std::io::stdin().read_line(&mut input_str).expect("Cannot read stdin!");
+        let input_str = input_str.trim();
+        let ver_obj = ver_obj[input_num].as_object_mut().unwrap();
+        ver_obj.remove("name");
+        ver_obj.insert(String::from("name"), serde_json::Value::String(input_str.to_string()));
+    }
+    save_version();
+    println!("{}", ansi_term::Color::Green.paint("修改成功！"));
+}
+pub fn remove_root() {
+    unsafe {
+        let ver_obj = VERSION_JSON.get_mut("mc").expect("JSON Parse Error!");
+        let ver_obj = ver_obj.as_array_mut().expect("JSON Parse Error!");
+        let mut res: Vec<String> = Vec::new();
+        for i in 0..ver_obj.len() {
+            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
+            let n = j.get("name").expect("JSON Parse Error!");
+            let p = j.get("path").expect("JSON Parse Error!");
+            let n = n.as_str().expect("JSON Parse Error!");
+            let p = p.as_str().expect("JSON Parse Error!");
+            res.push(format!("{}. {} - {}", i + 1, n, p));
+        }
+        if res.len() == 0 {
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未添加任意文件夹哦！请添加一个再来！"));
+            return;
+        }
+        println!("----------------------------------------------");
+        println!("请输入你要移除的文件列表：");
+        for i in res.iter() {
+            println!("{}", i);
+        }
+        println!("----------------------------------------------");
+        let mut input_num = String::new();
+        std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+        let input_num = input_num.trim().parse::<usize>();
+        if let Err(_) = input_num {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num.unwrap();
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num - 1;
+        if CHOOSE_VERSION > input_num as i32 {
+            CHOOSE_VERSION -= 1;
+        } else if CHOOSE_VERSION == input_num as i32 {
+            CHOOSE_VERSION = -1;
+            CHOOSE_VERSION_SEL = -1;
+            CURRENT_VERSION = String::new();
+            CURRENT_VERSION_SEL = String::new();
+            VERSION_SEL_JSON = serde_json::from_str::<serde_json::Value>("{\"mcsel\":[]}").unwrap();
+        }
+        crate::main_method::TLM_INI.write_str("MC", "SelectMC", CHOOSE_VERSION.to_string().as_str());
+        ver_obj.remove(input_num);
+    }
+    reload_version();
+    save_version();
+    println!("{}", ansi_term::Color::Green.paint("移除成功！"));
+}
+pub fn rename_version() {
     unsafe {
         let ver_obj = VERSION_SEL_JSON.as_object().expect("JSON Parse Error!");
         let ver_obj = ver_obj.get("mcsel").expect("JSON Parse Error!");
@@ -99,6 +227,123 @@ pub fn choose_version() {
         }
         if res.len() == 0 {
             println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任意文件夹哦！请选择一个再来！"));
+            return;
+        }
+        println!("----------------------------------------------");
+        println!("请输入你要重命名的游戏版本：");
+        for i in res.iter() {
+            println!("{}", i);
+        }
+        println!("----------------------------------------------");
+        let mut input_num = String::new();
+        std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+        let input_num = input_num.trim().parse::<usize>();
+        if let Err(_) = input_num {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num.unwrap();
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num - 1;
+        println!("请输入要修改的名称：");
+        let mut input_str = String::new();
+        std::io::stdin().read_line(&mut input_str).expect("Cannot read stdin!");
+        let input_str = input_str.trim();
+        if input_str.is_empty() {
+            println!("{}", ansi_term::Color::Red.paint("要修改的名称不能为空！请重新输入！"));
+            return;
+        }
+        let p_vec = vec!["<", ">", ":", "\"", "/", "\\", "|", "?", "*"];
+        for i in p_vec.into_iter() {
+            if input_str.contains(i) {
+                println!("你的文件名中包含非法字符！不允许重命名！请重试！");
+                return;
+            }
+        }
+        let path = ver_obj[input_num]["path"].as_str().unwrap();
+        let path = format!("{}\\versions\\{}", CURRENT_VERSION.clone(), path);
+        let path = path.as_str();
+        let path = std::path::Path::new(path);
+        let parent = path.parent().unwrap();
+        let path2 = parent.join(input_str);
+        let path2 = path2.as_path();
+        std::fs::rename(path, path2).expect("Cannot rename file path!");
+    }
+    reload_version();
+    println!("{}", ansi_term::Color::Green.paint("修改成功！"));
+}
+pub fn remove_version() {
+    unsafe {
+        let ver_obj = VERSION_SEL_JSON.as_object().expect("JSON Parse Error!");
+        let ver_obj = ver_obj.get("mcsel").expect("JSON Parse Error!");
+        let ver_obj = ver_obj.as_array().expect("JSON Parse Error!");
+        let mut res: Vec<String> = Vec::new();
+        for i in 0..ver_obj.len() {
+            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
+            let p = j.get("path").expect("JSON Parse Error!");
+            let p = p.as_str().expect("JSON Parse Error!");
+            res.push(format!("{}. {}", i + 1, p));
+        }
+        if res.len() == 0 {
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任意文件夹哦！请选择一个再来！"));
+            return;
+        }
+        println!("----------------------------------------------");
+        println!("请输入你要移除的游戏版本：");
+        for i in res.iter() {
+            println!("{}", i);
+        }
+        println!("----------------------------------------------");
+        let mut input_num = String::new();
+        std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+        let input_num = input_num.trim().parse::<usize>();
+        if let Err(_) = input_num {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num.unwrap();
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num - 1;
+        let path = ver_obj[input_num]["path"].as_str().unwrap();
+        let path = format!("{}\\versions\\{}", CURRENT_VERSION.clone(), path);
+        let path = path.as_str();
+        std::fs::remove_dir_all(path).expect("Cannot remove version dir!");
+        if (input_num as i32) < CHOOSE_VERSION_SEL {
+            CHOOSE_VERSION_SEL -= 1;
+        } else if (input_num as i32) == CHOOSE_VERSION_SEL {
+            CHOOSE_VERSION_SEL = -1;
+            CURRENT_VERSION_SEL = String::new();
+        }
+        crate::main_method::TLM_INI.write_str("MC", "SelectVer", CHOOSE_VERSION_SEL.to_string().as_str());
+    }
+    reload_version();
+    save_version();
+    println!("{}", ansi_term::Color::Green.paint("删除完成！"));
+}
+pub fn choose_version() {
+    unsafe {
+        if CHOOSE_VERSION < 0 {
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未添加任意文件夹哦！请添加一个再来！"));
+            return;
+        }
+        let ver_obj = VERSION_SEL_JSON.as_object().expect("JSON Parse Error!");
+        let ver_obj = ver_obj.get("mcsel").expect("JSON Parse Error!");
+        let ver_obj = ver_obj.as_array().expect("JSON Parse Error!");
+        let mut res: Vec<String> = Vec::new();
+        for i in 0..ver_obj.len() {
+            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
+            let p = j.get("path").expect("JSON Parse Error!");
+            let p = p.as_str().expect("JSON Parse Error!");
+            res.push(format!("{}. {}", i + 1, p));
+        }
+        if res.len() == 0 {
+            println!("{}", ansi_term::Color::Yellow.paint("你的文件夹里没有一个游戏版本噢！请去下载一个再来吧！！"));
             return;
         }
         println!("----------------------------------------------");
@@ -122,7 +367,7 @@ pub fn choose_version() {
         let input_num = input_num - 1;
         crate::main_method::TLM_INI.write_str("MC", "SelectVer", input_num.to_string().as_str());
         CHOOSE_VERSION_SEL = input_num as i32;
-        CURRENT_VERSION_SEL = ver_obj[input_num].get("path").unwrap().to_string();
+        CURRENT_VERSION_SEL = ver_obj[input_num]["path"].to_string();
     }
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
@@ -162,25 +407,13 @@ pub fn choose_root() {
             return;
         }
         let input_num = input_num - 1;
-        crate::main_method::TLM_INI.write_str("MC", "SelectMC", input_num.to_string().as_str());
         CHOOSE_VERSION = input_num as i32;
-        let act_ver = ver_obj[input_num].clone();
-        let act_ver = act_ver.get("path").expect("JSON Parse Error!");
-        let act_ver = act_ver.as_str().expect("JSON Parse Error!");
-        let act_ver = act_ver.replace("\\\\", "\\");
-        let path = std::path::Path::new(act_ver.as_str());
-        let path = path.join("versions");
-        let ver_obj = VERSION_SEL_JSON.get_mut("mcsel").expect("JSON Parse Error!").as_array_mut().expect("JSON Parse Error!");
-        ver_obj.clear();
-        let walk = walkdir::WalkDir::new(path).max_depth(1).min_depth(1);
-        for i in walk.into_iter().filter_map(|e| e.ok()) {
-            let i = i.path().to_str().unwrap();
-            let mut push_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
-            let push_obj = push_obj.as_object_mut().unwrap();
-            push_obj.insert(String::from("path"), serde_json::from_str(format!("\"{}\"", i.replace("\\", "\\\\").replace("/", "\\\\")).as_str()).unwrap());
-            ver_obj.push(serde_json::Value::Object(push_obj.clone()));
-        }
+        CHOOSE_VERSION_SEL = -1;
+        let act_ver = ver_obj[input_num]["path"].as_str().unwrap().to_string();
         CURRENT_VERSION = act_ver.clone();
+        crate::main_method::TLM_INI.write_str("MC", "SelectMC", input_num.to_string().as_str());
+        crate::main_method::TLM_INI.write_str("MC", "SelectVer", "-1");
+        reload_version();
     }
     save_version();
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
@@ -205,8 +438,8 @@ pub fn add_directory() {
         let ver_obj = ver_obj.as_array_mut().expect("JSON Parse Error!");
         let mut push_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
         let push_obj = push_obj.as_object_mut().unwrap();
-        push_obj.insert(String::from("name"), serde_json::from_str(format!("\"{}\"", input_name.clone()).as_str()).unwrap());
-        push_obj.insert(String::from("path"), serde_json::from_str(format!("\"{}\"", input_dir.clone().replace("\\", "\\\\").replace("/", "\\\\")).as_str()).unwrap());
+        push_obj.insert(String::from("name"), serde_json::Value::String(input_name.clone()));
+        push_obj.insert(String::from("path"), serde_json::Value::String(input_dir.clone().replace("/", "\\")));
         ver_obj.push(serde_json::Value::Object(push_obj.clone()));
     }
     save_version();
