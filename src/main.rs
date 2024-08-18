@@ -1,3 +1,4 @@
+use std::io::Write;
 use version::CURRENT_VERSION_SEL;
 
 mod rust_lib;
@@ -6,6 +7,8 @@ mod main_method;
 mod read_ini;
 mod version;
 mod launch;
+mod account;
+mod plugin;
 
 fn show_title(){
     println!(r" _____                _      _                                 _                  ___  ___            _         _       ");
@@ -30,6 +33,7 @@ fn show_main_menu(){
     println!("|        8. 账号部分                         |");
     println!("|        9. 下载部分                         |");
     println!("|        10. 杂项部分                        |");
+    println!("|        11. 加载插件                        |");
     println!("|        q. 退出启动器                       |");
     println!("----------------------------------------------");
 }
@@ -70,8 +74,59 @@ fn show_launch() {
     println!("|        q. 退出当前页                       |");
     println!("----------------------------------------------");
 }
+fn show_account() {
+    println!("----------------------------------------------");
+    println!("|        请输入对应的数字启动对应的功能      |");
+    println!("|        0. 查看当前账号信息                 |");
+    println!("|        1. 选择账号                         |");
+    println!("|        2. 添加离线登录                     |");
+    println!("|        3. 添加微软登录                     |");
+    println!("|        4. 添加外置登录                     |");
+    println!("|        5. 检测Authlib的更新                |");
+    println!("|        6. 移除账号                         |");
+    println!("|        7. 刷新账号                         |");
+    println!("|        q. 退出当前页                       |");
+    println!("----------------------------------------------");
+}
 fn output_tlm_version() {
     println!("当前TLM版本：{}", rust_lib::some_const::TLM_VERSION);
+}
+fn output_account() {
+    show_account();
+    loop {
+        print!(">>> ");
+        use std::io::Write;
+        std::io::stdout().flush().expect("Cannot flush message!");
+        let mut main_choice = String::new();
+        std::io::stdin().read_line(&mut main_choice).expect("Cannot read stdin!");
+        main_choice = main_choice.trim().to_string();
+        if main_choice.eq("q") {
+            show_main_menu(); 
+            return; 
+        }
+        let conv = main_choice.parse::<i8>();
+        if let Ok(t) = conv {
+            match t {
+                0 => {
+                },
+                1 => {
+                },
+                2 => {
+                },
+                3 => {
+                }
+                4 => {
+                }
+                5 => {
+                }
+                6 => {
+                }
+                _ => println!("{}", ansi_term::Color::Red.paint("请不要输入0-11以外的数字噢！")),
+            }
+        }else{
+            println!("{}", ansi_term::Color::Red.paint("请不要输入数字以外的字符噢！"));
+        }
+    }
 }
 fn outout_launch() {
     show_launch();
@@ -334,11 +389,65 @@ fn launch_game(){
 }
 
 fn test() {
-    // let f = std::fs::remove_dir_all("D:\\testdir");
-    // let f = std::fs::rename("D:\\testdir", "D:\\testdirr");
-    // if let Err(e) = f {
-    //     println!("{:?}", e);
+    // let a = rust_lib::account_mod::UrlMethod::new("https://piston-meta.mojang.com/v1/packages/94f420093e771cd1e72614184736b044c747a8df/1.21.1.json");
+    // let b = a.get_default();
+    // if let Some(e) = b {
+    //     let mut file = std::fs::File::create("D:\\aa.json").unwrap();
+    //     file.write_all(&e).unwrap();
     // }
+    let aa = rust_lib::launcher_mod::get_mc_real_path("D:\\mc\\testmc\\.minecraft\\versions\\1.21-Fabric_0.16.0".to_string(), ".json");
+    if let Some(_) = aa {
+        println!("OK");
+    }else {
+        println!("Err")
+    }
+}
+fn load_plugin() {
+    unsafe {
+        let pp = std::path::Path::new(main_method::CURRENT_DIR.as_str());
+        let pp = pp.join("TankLauncherModule");
+        let pp = pp.join("plugins");
+        if !pp.exists() || pp.exists() && pp.is_file() {
+            std::fs::create_dir_all(pp.clone()).expect("Cannot create dir!");
+        }
+        let mut res: Vec<String> = Vec::new();
+        let walk = walkdir::WalkDir::new(pp.clone()).min_depth(1).max_depth(1);
+        for i in walk.into_iter().filter_map(|e| e.ok()) {
+            let ext = i.path().extension().unwrap().to_str().unwrap().to_string();
+            if ext.eq("lua") {
+                res.push(format!("{}", i.file_name().to_str().unwrap().to_string()));
+            }
+        }
+        if res.len() <= 0 {
+            println!("{}", ansi_term::Color::Yellow.paint("你目前还没有写任何一个插件噢！请尝试添加一个插件吧！"));
+            return;
+        }
+        println!("----------------------------------------------");
+        println!("请输入你要选择的插件：");
+        for i in 0..res.len() {
+            println!("{}. {}", i + 1, res[i]);
+        }
+        println!("----------------------------------------------");
+        let mut input_num = String::new();
+        std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+        let input_num = input_num.trim().parse::<usize>();
+        if let Err(_) = input_num {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num.unwrap();
+        if input_num > res.len() || input_num < 1 {
+            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+            return;
+        }
+        let input_num = input_num - 1;
+        let j = &res[input_num];
+        let apath = pp.join(j).to_str().unwrap().to_string();
+        let res = plugin::load_lua_plugin(apath.as_str());
+        if let Err(e) = res {
+            println!("{}", ansi_term::Color::Red.paint(format!("{:?}", e)))
+        }
+    }
 }
 fn command_judge_launch(a: Vec<String>) {
     let mut root_dir = String::new();
@@ -435,6 +544,7 @@ fn command_judge_launch(a: Vec<String>) {
         } else {
             version
         });
+        println!("{}", version);
         let game_dir = if isolation.eq("true") { version.clone() } else if isolation.eq("false") { root_dir.clone() } else {
             launcher::is_isolation(root_dir.clone(), version.clone()).clone()
         };
@@ -656,13 +766,16 @@ fn tank_launcher_module_test_main(){
                     println!("暂未实现！");
                 }
                 8 => {
-                    println!("暂未实现！");
+                    output_account();
                 }
                 9 => {
                     println!("暂未实现！");
                 }
                 10 => {
                     println!("暂未实现！");
+                }
+                11 => {
+                    load_plugin()
                 }
                 _ => println!("{}", ansi_term::Color::Red.paint("请不要输入0-10以外的数字噢！")),
             }

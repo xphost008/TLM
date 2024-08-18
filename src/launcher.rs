@@ -25,10 +25,11 @@ pub fn is_isolation(root_path: String, sel_path: String) -> String {
 
 pub fn start_launch(option: crate::rust_lib::launcher_mod::LaunchOption){
     let catch = std::panic::catch_unwind(|| {
-        let launch = crate::rust_lib::launcher_mod::launch_game(option, |command| {
+        let option = option.clone();
+        let launch = crate::rust_lib::launcher_mod::launch_game(option.clone(), move |command| {
             unsafe {
                 let output_file_path = format!("{}\\TankLauncherModule\\run.bat", crate::main_method::APP_DATA);
-                let game_path = command[command.iter().position(|x| x.eq(&"--gameDir")).unwrap() + 1];
+                let game_path = option.get_game_path();
                 let cmd_str = command.iter().map(|e| format!("\"{}\"", e.to_string())).collect::<Vec<String>>().join(" ");
                 if crate::rust_lib::main_mod::set_file(output_file_path.as_str(), cmd_str.clone()) {
                     println!("参数拼接成功！正在为您启动游戏！");

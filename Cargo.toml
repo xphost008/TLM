@@ -42,3 +42,4 @@ rust-ini = "0.21.0"  # 调用ini
 rpassword = "7.3.1"  # 写入密码（外置登录时要用）
 ansi_term = "0.12.1"  # 控制台颜色
 winreg = "0.52.0"  # 读取Windows注册表
+mlua = { version = "0.9.9", features = ["lua54", "vendored"] }

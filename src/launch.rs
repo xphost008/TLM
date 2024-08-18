@@ -67,7 +67,6 @@ fn recursion_search_java(path: String) -> bool {
                 add_java_simple(path.to_str().unwrap().to_string());
             }
         }
-        println!("{}", ne);
     }
     return true;
 }
