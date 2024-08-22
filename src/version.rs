@@ -338,8 +338,7 @@ pub fn choose_version() {
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
             let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!");
-            let p = p.as_str().expect("JSON Parse Error!");
+            let p = j.get("path").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {}", i + 1, p));
         }
         if res.len() == 0 {
@@ -378,10 +377,8 @@ pub fn choose_root() {
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
             let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!");
-            let n = n.as_str().expect("JSON Parse Error!");
-            let p = p.as_str().expect("JSON Parse Error!");
+            let n = j.get("name").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let p = j.get("path").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {} - {}", i + 1, n, p));
         }
         if res.len() == 0 {

@@ -24,7 +24,7 @@ pub fn is_isolation(root_path: String, sel_path: String) -> String {
 }
 
 pub fn start_launch(option: crate::rust_lib::launcher_mod::LaunchOption){
-    let catch = std::panic::catch_unwind(|| {
+    let catch = std::panic::catch_unwind(move || {
         let option = option.clone();
         let launch = crate::rust_lib::launcher_mod::launch_game(option.clone(), move |command| {
             unsafe {

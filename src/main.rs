@@ -1,5 +1,4 @@
-use std::io::Write;
-use version::CURRENT_VERSION_SEL;
+use clipboard::ClipboardProvider;
 
 mod rust_lib;
 mod launcher;
@@ -9,6 +8,7 @@ mod version;
 mod launch;
 mod account;
 mod plugin;
+mod privacy;
 
 fn show_title(){
     println!(r" _____                _      _                                 _                  ___  ___            _         _       ");
@@ -80,16 +80,17 @@ fn show_account() {
     println!("|        0. 查看当前账号信息                 |");
     println!("|        1. 选择账号                         |");
     println!("|        2. 添加离线登录                     |");
-    println!("|        3. 添加微软登录                     |");
-    println!("|        4. 添加外置登录                     |");
-    println!("|        5. 检测Authlib的更新                |");
-    println!("|        6. 移除账号                         |");
-    println!("|        7. 刷新账号                         |");
+    println!("|        3. 通过正版名称获取UUID             |");
+    println!("|        4. 添加微软登录                     |");
+    println!("|        5. 添加外置登录                     |");
+    println!("|        6. 检测Authlib的更新                |");
+    println!("|        7. 移除账号                         |");
+    println!("|        8. 刷新账号                         |");
     println!("|        q. 退出当前页                       |");
     println!("----------------------------------------------");
 }
 fn output_tlm_version() {
-    println!("当前TLM版本：{}", rust_lib::some_const::TLM_VERSION);
+    println!("当前TLM版本：{}", rust_lib::some_const::LAUNCHER_VERSION);
 }
 fn output_account() {
     show_account();
@@ -102,24 +103,37 @@ fn output_account() {
         main_choice = main_choice.trim().to_string();
         if main_choice.eq("q") {
             show_main_menu(); 
-            return; 
+            return;
         }
         let conv = main_choice.parse::<i8>();
         if let Ok(t) = conv {
             match t {
                 0 => {
+                    println!("暂未实现！");
                 },
                 1 => {
+                    account::choose_account();
                 },
                 2 => {
+                    account::add_offline();
                 },
                 3 => {
+                    account::get_legal_uuid();
                 }
                 4 => {
+                    account::add_microsoft();
                 }
                 5 => {
+                    println!("暂未实现！");
                 }
                 6 => {
+                    println!("暂未实现！");
+                }
+                7 => {
+                    account::remove_account();
+                }
+                8 => {
+                    account::refresh_account();
                 }
                 _ => println!("{}", ansi_term::Color::Red.paint("请不要输入0-11以外的数字噢！")),
             }
@@ -385,22 +399,79 @@ fn output_help(){
     println!("该启动器目前暂不支持【--长参数=值】形式，仅支持【-短参数 值】或者【--长参数 值】")
 }
 fn launch_game(){
-    //TODO: 按照默认设置启动游戏！
+    command_judge_launch(vec![], true);
 }
 
-fn test() {
-    // let a = rust_lib::account_mod::UrlMethod::new("https://piston-meta.mojang.com/v1/packages/94f420093e771cd1e72614184736b044c747a8df/1.21.1.json");
-    // let b = a.get_default();
-    // if let Some(e) = b {
-    //     let mut file = std::fs::File::create("D:\\aa.json").unwrap();
-    //     file.write_all(&e).unwrap();
-    // }
-    let aa = rust_lib::launcher_mod::get_mc_real_path("D:\\mc\\testmc\\.minecraft\\versions\\1.21-Fabric_0.16.0".to_string(), ".json");
-    if let Some(_) = aa {
-        println!("OK");
-    }else {
-        println!("Err")
-    }
+fn test(){
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let login = rust_lib::account_mod::AccountLogin::new(privacy::MS_CLIENT_ID);
+        let (user_code, device_code) = login.get_user_code().await.unwrap();
+        println!("请复制你的用户代码，并将其粘贴到浏览器上：{}", user_code);
+        let mut cb: clipboard::ClipboardContext = clipboard::ClipboardProvider::new().unwrap();
+        cb.set_contents(user_code.to_owned()).unwrap();
+        std::process::Command::new("explorer.exe").arg("https://www.microsoft.com/link").spawn().expect("Some Error appear!");
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            let s = login.login_microsoft(device_code.clone()).await;
+            match s {
+                Ok(e) => {
+                    println!("{}\n{}\n{}\n{}",e.get_name(), e.get_uuid(), e.get_access_token(), e.get_refresh_token());
+                    break;
+                },
+                Err(e) => {
+                    match e {
+                        // -2错误是暂未完成登录，重新开始一次循环。因此不用捕获。
+                        -3 => {
+                            println!("登录超时（15分钟未完成登录），请重试！");
+                            break;
+                        },  
+                        // -4错误是刷新账号时出现的错误，这里不用捕获。
+                        -5 => {
+                            println!("在进行xbox登录时出现了错误，可能是没挂vβn的原因。");
+                            break;
+                        },
+                        -6 => {
+                            println!("在进行xsts登录时出现了错误，可能是没挂vβn的原因。");
+                            break;
+                        },
+                        -7 => {
+                            println!("在进行xsts登录时，由于该账户没有xbox账号，你可能需要自己注册一个。");
+                            break;
+                        },
+                        -8 => {
+                            println!("在进行xsts登录时，由于该国家/禁止被禁止，无法登录。");
+                            break;
+                        },
+                        -9 => {
+                            println!("该账号需要成人验证（韩国）。");
+                            break;
+                        },
+                        -10 => {
+                            println!("该账号设置未满18周岁，需要成人将该账户添加到家庭组中。");
+                            break;
+                        },
+                        -11 => {
+                            println!("你请求的xbox usercode与xsts usercode二者不一致，请重新尝试！");
+                            break;
+                        },
+                        -12 => {
+                            println!("在进行mc登录时出现了错误，可能是没挂vβn的原因。");
+                            break;
+                        },
+                        -13 => {
+                            println!("该账号暂未购买mc，请重新尝试！");
+                            break;
+                        }
+                        _ => {
+                            println!("出现了未知错误，请立即反馈给作者！错误代码：{}", e);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 fn load_plugin() {
     unsafe {
@@ -441,20 +512,40 @@ fn load_plugin() {
             return;
         }
         let input_num = input_num - 1;
-        let j = &res[input_num];
-        let apath = pp.join(j).to_str().unwrap().to_string();
-        let res = plugin::load_lua_plugin(apath.as_str());
+        let j = res[input_num].clone();
+        let path = pp.join(j).to_str().unwrap().to_string();
+        let res = plugin::load_lua_plugin(path.as_str());
         if let Err(e) = res {
             println!("{}", ansi_term::Color::Red.paint(format!("{:?}", e)))
         }
     }
 }
-fn command_judge_launch(a: Vec<String>) {
+fn command_judge_launch(a: Vec<String>, is_panic: bool) {
+    fn struct_to_launch(jiegou: account::AccountStruct) -> rust_lib::launcher_mod::LaunchAccount {
+        if jiegou.get_online() == 1 {
+            rust_lib::launcher_mod::LaunchAccount::new_offline(
+                jiegou.get_name().as_str(),
+                jiegou.get_uuid().as_str())
+        } else if jiegou.get_online() == 2 {
+            rust_lib::launcher_mod::LaunchAccount::new_microsoft(
+                jiegou.get_name().as_str(), 
+                jiegou.get_uuid().as_str(), 
+                jiegou.get_access_token().as_str())
+        } else if jiegou.get_online() == 3 {
+            rust_lib::launcher_mod::LaunchAccount::new_thirdparty(
+                jiegou.get_name().as_str(), 
+                jiegou.get_uuid().as_str(), 
+                jiegou.get_access_token().as_str(), 
+                jiegou.get_base().as_str(), 
+                jiegou.get_url().as_str())
+        } else {
+            panic!("Cannot solve AccountStruct online mode!");
+        }
+    }
     let mut root_dir = String::new();
     let mut version = String::new();
     let mut java_path = String::new();
-    let mut account_user_name = String::new();
-    let mut account_user_uuid = String::new();
+    let mut account = account::AccountStruct::new();
     let mut window_width: usize = 0;
     let mut window_height = 0;
     let mut min_memory = 0;
@@ -477,14 +568,19 @@ fn command_judge_launch(a: Vec<String>) {
             i += 1;
         } else if s.eq("-a") || s.eq("--account") {
             if a.get(i + 1).expect("Cannot get account param!").clone().eq("Offline") {
+                let mut account_user_uuid = String::new();
                 i += 1;
-                account_user_name = a.get(i + 1).expect("Cannot get user name param!").clone();
+                let account_user_name = a.get(i + 1).expect("Cannot get user name param!").clone();
                 i += 1;
                 if a.get(i + 1).expect("Cannot get user uuid param!").clone().eq("default") {
-                    account_user_uuid = rust_lib::main_mod::generate_bukkit_uuid(account_user_name.as_str());
+                    account_user_uuid.push_str(rust_lib::main_mod::generate_bukkit_uuid(account_user_name.as_str()).as_str());
                 }else{
-                    account_user_uuid = a[i + 1].clone();
+                    account_user_uuid.push_str(a[i + 1].clone().as_str());
                 }
+                account.set_account(account_user_name.as_str(), account_user_uuid.as_str(), "", "", "", "", 1);
+            }else if a.get(i + 1).expect("Cannot get account param!").clone().eq("Microsoft"){
+                let account_result = account::set_microsoft(privacy::MS_CLIENT_ID);
+                account.copy(account_result);
             }
             i += 1;
         } else if s.eq("-w") || s.eq("--width") {
@@ -528,9 +624,25 @@ fn command_judge_launch(a: Vec<String>) {
         i += 1;
     }
     unsafe {
+        if account.is_not_init() {
+            if account::CHOOSE_ACCOUNT < 0 {
+                if is_panic {
+                    panic!("account param connot be empty!")
+                }else{
+                    println!("账号不能为空！");
+                    return;
+                }
+            }
+            account.copy(account::CURRENT_ACCOUNT.clone());
+        }
         root_dir = if root_dir.is_empty() {
             if version::CHOOSE_VERSION < 0 {
-                panic!("game dir param cannot be empty!");
+                if is_panic {
+                    panic!("game dir param cannot be empty!");
+                }else{
+                    println!("游戏目录不能为空！");
+                    return;
+                }
             }
             version::CURRENT_VERSION.clone()
         } else {
@@ -538,29 +650,40 @@ fn command_judge_launch(a: Vec<String>) {
         };
         version = format!("{}\\versions\\{}", root_dir.clone(), if version.is_empty() {
             if version::CHOOSE_VERSION_SEL < 0 {
-                panic!("version name param cannot be empty!");
+                if is_panic {
+                    panic!("version name param cannot be empty!");
+                }else{
+                    println!("游戏版本不能为空！");
+                    return;
+                }
             }
-            CURRENT_VERSION_SEL.clone()
+            version::CURRENT_VERSION_SEL.clone()
         } else {
             version
         });
-        println!("{}", version);
         let game_dir = if isolation.eq("true") { version.clone() } else if isolation.eq("false") { root_dir.clone() } else {
             launcher::is_isolation(root_dir.clone(), version.clone()).clone()
         };
         java_path = if java_path.is_empty() {
             if launch::CHOOSE_JAVA < 0 {
-                panic!("java path param cannot be empty!");
+                if is_panic {
+                    panic!("java path param cannot be empty!");
+                }else{
+                    println!("Java路径不能为空！");
+                    return;
+                }
             }
             launch::CURRENT_JAVA.clone()
         }else{
             java_path
         };
-        if account_user_name.is_empty() {
-            panic!("user name param cannot be empty!");
-        }
-        if account_user_uuid.is_empty() {
-            panic!("user uuid param cannot be empty!");
+        if account.get_name().is_empty() || account.get_uuid().is_empty() {
+            if is_panic {
+                panic!("account param cannot be empty!");
+            }else{
+                println!("账号名称或UUID不能为空！");
+                return;
+            }
         }
         window_width = if window_width == 0 { launch::WINDOW_WIDTH } else { window_width };
         window_height = if window_height == 0 { launch::WINDOW_HEIGHT } else { window_height };
@@ -569,7 +692,7 @@ fn command_judge_launch(a: Vec<String>) {
         custom_info = if custom_info.is_empty() { launch::CUSTOM_INFO.clone() } else { custom_info.clone() };
         additional_jvm = if additional_jvm.is_empty() { launch::ADDITIONAL_JVM.clone() } else { additional_jvm.clone() };
         additional_game = if additional_game.is_empty() { launch::ADDITIONAL_GAME.clone() } else { additional_game.clone() };
-        let account = rust_lib::launcher_mod::LaunchAccount::new_offline(account_user_name.as_str(), account_user_uuid.as_str());
+        let account = struct_to_launch(account);
         let mut option = rust_lib::launcher_mod::LaunchOption::new(
                 account, 
                 java_path.as_str(), 
@@ -588,10 +711,14 @@ fn command_judge_launch(a: Vec<String>) {
 }
 fn unsafe_init() {
     unsafe {
-        let dir = dirs::data_dir().expect("Cannot get AppData dir!");
-        let dir = dir.as_path().display().to_string();
-        main_method::APP_DATA = dir.clone();
-        let other_ini_path = format!("{}\\TankLauncherModule\\Other.ini", dir.clone());
+        let appdata_dir = dirs::data_dir().expect("Cannot get AppData dir!");
+        let appdata_dir = appdata_dir.as_path().display().to_string();
+        main_method::APP_DATA = appdata_dir.clone();
+        let appdata_path = std::path::Path::new(appdata_dir.as_str());
+        let appdata_path = appdata_path.join("TankLauncherModule");
+        let appdata_path = appdata_path.to_path_buf();
+        let other_ini_path = appdata_path.join("Other.ini");
+        let other_ini_path = other_ini_path.to_string_lossy().to_string();
         main_method::OTHER_INI.set_path(other_ini_path.as_str());
         let current_path = std::env::current_exe().expect("Cannot get current exe dir!");
         let current_path = current_path.parent().expect("Cannot get current exe dir!");
@@ -601,6 +728,80 @@ fn unsafe_init() {
         let tlm_ini_path = config_path.join("TankLauncherModule.ini");
         let tlm_path_str = tlm_ini_path.to_str().expect("Cannot get current exe dir!");
         main_method::TLM_INI.set_path(tlm_path_str);
+        let account_json_path = appdata_path.join("AccountJSON.json");
+        if !account_json_path.exists() {
+            let acc = serde_json::from_str::<serde_json::Value>("{\"account\":[]}").unwrap();
+            account::ACCOUNT_JSON = serde_json::Value::Object(acc.as_object().unwrap().clone());
+            let acc = serde_json::to_string_pretty(&acc).unwrap();
+            rust_lib::main_mod::set_file(account_json_path.to_str().unwrap(), acc);
+        } else {
+            let acc = rust_lib::main_mod::get_file(account_json_path.to_str().unwrap()).expect("Config AccountJSON.json is error!");
+            let acc = serde_json::from_str::<serde_json::Value>(acc.as_str()).expect("Config AccountJSON.json is error!");
+            let acc = acc.as_object().expect("Config AccountJSON.json is error!");
+            account::CHOOSE_ACCOUNT = main_method::OTHER_INI.read_int("Account", "SelectAccount", -1);
+            if account::CHOOSE_ACCOUNT != -1 {
+                let current = acc
+                    .get("account")
+                    .expect("Config AccountJSON.json is error!")
+                    .get(account::CHOOSE_ACCOUNT as usize)
+                    .expect("Config AccountJSON.json is error!");
+                let atype = current
+                    .get("type")
+                    .expect("Config AccountJSON.json is error!")
+                    .as_str()
+                    .expect("Config AccountJSON.json is error!");
+                if atype.eq("offline") {
+                    account::CURRENT_ACCOUNT.set_account(current
+                        .get("name")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
+                        .get("uuid")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), "", "", "", "", 1);
+                } else if atype.eq("microsoft") {
+                    account::CURRENT_ACCOUNT.set_account(current
+                        .get("name")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
+                        .get("uuid")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
+                        .get("access_token")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), "", "", "", 2);
+                } else if atype.eq("thirdparty") {
+                    account::CURRENT_ACCOUNT.set_account(current
+                        .get("name")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
+                        .get("uuid")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
+                        .get("access_token")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), "", current
+                        .get("server")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
+                        .get("base_code")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), 3);
+                } else {
+                    panic!("Cannot solve AccountJSON type value")
+                }
+            }
+            account::ACCOUNT_JSON = serde_json::Value::Object(acc.clone());
+        }
         let mc_json_path = config_path.join("MCJSON.json");
         if !mc_json_path.exists(){
             let ver = serde_json::from_str::<serde_json::Value>("{\"mc\":[]}").unwrap();
@@ -608,10 +809,10 @@ fn unsafe_init() {
             let ver = serde_json::to_string_pretty(&ver).unwrap();
             rust_lib::main_mod::set_file(mc_json_path.to_str().unwrap(), ver);
         }else{
-            version::CHOOSE_VERSION = main_method::TLM_INI.read_int("MC", "SelectMC", -1);
             let ver = rust_lib::main_mod::get_file(mc_json_path.to_str().unwrap()).expect("Config MCJSON.json is error!");
             let ver = serde_json::from_str::<serde_json::Value>(ver.as_str()).expect("Config MCJSON.json is error!");
             let ver = ver.as_object().expect("Config MCJSON.json is error!");
+            version::CHOOSE_VERSION = main_method::TLM_INI.read_int("MC", "SelectMC", -1);
             if version::CHOOSE_VERSION != -1 {
                 let current = ver.get("mc").expect("Config MCJSON.json is error!");
                 let current = current.get(version::CHOOSE_VERSION as usize).expect("Config MCJSON.json is error!");
@@ -628,10 +829,10 @@ fn unsafe_init() {
             let ver = serde_json::to_string_pretty(&ver).unwrap();
             rust_lib::main_mod::set_file(mc_sel_path.to_str().unwrap(), ver);
         }else{
-            version::CHOOSE_VERSION_SEL = main_method::TLM_INI.read_int("MC", "SelectVer", -1);
             let ver = rust_lib::main_mod::get_file(mc_sel_path.to_str().unwrap()).expect("Config MCSelJSON.json is error!");
             let ver = serde_json::from_str::<serde_json::Value>(ver.as_str()).expect("Config MCSelJSON.json is error!");
             let ver = ver.as_object().expect("Config MCSelJSON.json is error!");
+            version::CHOOSE_VERSION_SEL = main_method::TLM_INI.read_int("MC", "SelectVer", -1);
             if version::CHOOSE_VERSION_SEL != -1 {
                 let current = ver.get("mcsel").expect("Config MCJSON.json is error!");
                 let current = current.get(version::CHOOSE_VERSION_SEL as usize).expect("Config MCJSON.json is error!");
@@ -649,10 +850,10 @@ fn unsafe_init() {
             let java = serde_json::to_string_pretty(&java).unwrap();
             rust_lib::main_mod::set_file(java_path.to_str().unwrap(), java);
         } else {
-            launch::CHOOSE_JAVA = main_method::TLM_INI.read_int("Java", "SelectJava", -1);
             let java = rust_lib::main_mod::get_file(java_path.to_str().unwrap()).expect("Config JavaJSON.json is error!");
             let java = serde_json::from_str::<serde_json::Value>(java.as_str()).expect("Config JavaJSON.json is error!");
             let java = java.as_object().expect("Config MCSelJSON.json is error!");
+            launch::CHOOSE_JAVA = main_method::TLM_INI.read_int("Java", "SelectJava", -1);
             if launch::CHOOSE_JAVA != -1 {
                 let current = java.get("java").expect("Config JavaJSON.json is error!");
                 let current = current.get(launch::CHOOSE_JAVA as usize).expect("Config JavaJSON.json is error!");
@@ -711,7 +912,7 @@ fn tank_launcher_module_test_main(){
             }
             output_help();
         }else if a[1].eq("-l") || a[1].eq("--launch") {
-            command_judge_launch(a);
+            command_judge_launch(a, true);
         }else if a[1].eq("-s") || a[1].eq("--setting") {
 
         }else if a[1].eq("-d") || a[1].eq("--download") {
