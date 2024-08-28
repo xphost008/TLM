@@ -6,12 +6,15 @@ pub static mut ACCOUNT_JSON: serde_json::Value = serde_json::Value::Null;
 pub static mut CHOOSE_ACCOUNT: i32 = -1;
 pub static mut CURRENT_ACCOUNT: AccountStruct = AccountStruct::new();
 
+static mut TEMP_ACC: AccountStruct = AccountStruct::new();
+
 #[derive(Clone)]
 pub struct AccountStruct {
     name: String,
     uuid: String,
     access_token: String,
     refresh_token: String,
+    client_token: String,
     url: String,
     base: String,
     online: i32
@@ -23,16 +26,18 @@ impl AccountStruct {
             uuid: String::new(),
             access_token: String::new(),
             refresh_token: String::new(),
+            client_token: String::new(),
             url: String::new(),
             base: String::new(),
             online: 0,
         }
     }
-    pub fn set_account(&mut self, name: &str, uuid: &str, access_token: &str, refresh_token: &str, url: &str, base: &str, online: i32) {
+    pub fn set_account(&mut self, name: &str, uuid: &str, access_token: &str, refresh_token: &str, client_token: &str, url: &str, base: &str, online: i32) {
         self.name = name.to_string();
         self.uuid = uuid.to_string();
         self.access_token = access_token.to_string();
         self.refresh_token = refresh_token.to_string();
+        self.client_token = client_token.to_string();
         self.url = url.to_string();
         self.base = base.to_string();
         self.online = online;
@@ -48,6 +53,9 @@ impl AccountStruct {
     }
     pub fn get_refresh_token(&self) -> String {
         self.refresh_token.clone()
+    }
+    pub fn get_client_token(&self) -> String {
+        self.client_token.clone()
     }
     pub fn get_url(&self) -> String {
         self.url.clone()
@@ -71,17 +79,16 @@ impl AccountStruct {
         self.online = copy.get_online();
     }
 }
-static mut ACC: AccountStruct = AccountStruct::new();
-pub fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
+fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async move {
-        let login = crate::rust_lib::account_mod::AccountLogin::new(client_id);
+        let login = crate::rust_lib::account_mod::AccountLogin::new_ms(client_id);
         let s = login.refresh_microsoft(refresh_token.to_string()).await;
         match s {
             Ok(e) => {
                 unsafe {
-                    ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", 2);
+                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 2);
                 }
             },
             Err(e) => {
@@ -139,7 +146,7 @@ pub fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
         }
     });
     unsafe {
-        return ACC.clone();
+        return TEMP_ACC.clone();
     }
 }
 pub fn remove_account() {
@@ -180,7 +187,7 @@ pub fn remove_account() {
             CHOOSE_ACCOUNT -= 1;
         } else if CHOOSE_ACCOUNT == input_num as i32 {
             CHOOSE_ACCOUNT = -1;
-            CURRENT_ACCOUNT.set_account("", "", "", "", "", "", 0);
+            CURRENT_ACCOUNT.set_account("", "", "", "", "", "", "", 0);
         }
         crate::main_method::OTHER_INI.write_str("Account", "SelectAccount", CHOOSE_ACCOUNT.to_string().as_str());
         acc_obj.remove(input_num);
@@ -192,7 +199,7 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async move {
-        let login = crate::rust_lib::account_mod::AccountLogin::new(client_id);
+        let login = crate::rust_lib::account_mod::AccountLogin::new_ms(client_id);
         let (user_code, device_code) = login.get_user_code().await.unwrap();
         println!("请复制你的用户代码，并将其粘贴到浏览器上：{}", user_code);
         let mut cb: clipboard::ClipboardContext = clipboard::ClipboardProvider::new().unwrap();
@@ -204,7 +211,7 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
             match s {
                 Ok(e) => {
                     unsafe {
-                        ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", 2);
+                        TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 2);
                     }
                     break;
                 },
@@ -216,48 +223,48 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
                             continue;
                         }
                         -3 => {
-                            println!("登录超时（15分钟未完成登录），请重试！");
+                            println!("{}", ansi_term::Color::Red.paint("登录超时（15分钟未完成登录），请重试！"));
                             break;
                         },  
                         // -4错误是刷新账号时出现的错误，这里不用捕获。
                         -5 => {
-                            println!("在进行xbox登录时出现了错误，可能是没挂vβn的原因。");
+                            println!("{}", ansi_term::Color::Red.paint("在进行xbox登录时出现了错误，可能是没挂vβn的原因。"));
                             break;
                         },
                         -6 => {
-                            println!("在进行xsts登录时出现了错误，可能是没挂vβn的原因。");
+                            println!("{}", ansi_term::Color::Red.paint("在进行xsts登录时出现了错误，可能是没挂vβn的原因。"));
                             break;
                         },
                         -7 => {
-                            println!("在进行xsts登录时，由于该账户没有xbox账号，你可能需要自己注册一个。");
+                            println!("{}", ansi_term::Color::Red.paint("在进行xsts登录时，由于该账户没有xbox账号，你可能需要自己注册一个。"));
                             break;
                         },
                         -8 => {
-                            println!("在进行xsts登录时，由于该国家/禁止被禁止，无法登录。");
+                            println!("{}", ansi_term::Color::Red.paint("在进行xsts登录时，由于该国家/禁止被禁止，无法登录。"));
                             break;
                         },
                         -9 => {
-                            println!("该账号需要成人验证（韩国）。");
+                            println!("{}", ansi_term::Color::Red.paint("该账号需要成人验证（韩国）。"));
                             break;
                         },
                         -10 => {
-                            println!("该账号设置未满18周岁，需要成人将该账户添加到家庭组中。");
+                            println!("{}", ansi_term::Color::Red.paint("该账号设置未满18周岁，需要成人将该账户添加到家庭组中。"));
                             break;
                         },
                         -11 => {
-                            println!("你请求的xbox usercode与xsts usercode二者不一致，请重新尝试！");
+                            println!("{}", ansi_term::Color::Red.paint("你请求的xbox usercode与xsts usercode二者不一致，请重新尝试！"));
                             break;
                         },
                         -12 => {
-                            println!("在进行mc登录时出现了错误，可能是没挂vβn的原因。");
+                            println!("{}", ansi_term::Color::Red.paint("在进行mc登录时出现了错误，可能是没挂vβn的原因。"));
                             break;
                         },
                         -13 => {
-                            println!("该账号暂未购买mc，请重新尝试！");
+                            println!("{}", ansi_term::Color::Red.paint("该账号暂未购买mc，请重新尝试！"));
                             break;
                         }
                         _ => {
-                            println!("出现了未知错误，请立即反馈给作者！错误代码：{}", e);
+                            println!("{}{}", ansi_term::Color::Red.paint("出现了未知错误，请立即反馈给作者！错误代码："), e);
                             break;
                         }
                     }
@@ -266,7 +273,102 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
         }
     });
     unsafe {
-        return ACC.clone();
+        return TEMP_ACC.clone();
+    }
+}
+fn sr_thirdparty(server: &str, access_token: &str, client_token: &str) -> AccountStruct {
+    //使用tokio执行异步程序，但是阻塞了主线程。
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async move {
+        let login = crate::rust_lib::account_mod::AccountLogin::new_tp(server);
+        let s = login.refresh_thirdparty(access_token.to_string(), client_token.to_string()).await;
+        match s {
+            Ok(e) => {
+                unsafe {
+                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), "", e.get_client_token().as_str(), server, e.get_base().as_str(), 3);
+                }
+            },
+            Err(e) => {
+                match e {
+                    -16 => {
+                        println!("{}", ansi_term::Color::Red.paint("无法获取网址，请确保你已经连接网络。"));
+                        return;
+                    }
+                    -17 => {
+                        println!("{}", ansi_term::Color::Red.paint("令牌已失效，请重新登录一次！"));
+                        return;
+                    }
+                    _ => {
+                        println!("{}{}", ansi_term::Color::Red.paint("出现了未知错误，请立即反馈给作者！错误代码："), e);
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    unsafe {
+        return TEMP_ACC.clone();
+    }
+}
+pub fn set_thirdparty(server: &str, username: &str, password: &str, client_token: &str) -> AccountStruct {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async move {
+        let login = crate::rust_lib::account_mod::AccountLogin::new_tp(server);
+        let res = login.login_thirdparty(String::from(username), String::from(password), String::from(client_token)).await;
+        match res {
+            Ok(e) => {
+                let mut res: Vec<String> = Vec::new();
+                for i in 0..e.len() {
+                    res.push(format!("{}. {}", i + 1, e[i].get_name()));
+                }
+                if res.len() == 0 {
+                    println!("{}", ansi_term::Color::Yellow.paint("你的第三方登录暂未选择任意皮肤噢！请选择一个再来！"));
+                    return;
+                }
+                println!("----------------------------------------------");
+                println!("请输入你要登录的第三方账号：");
+                for i in res.iter() {
+                    println!("{}", i);
+                }
+                println!("----------------------------------------------");
+                let mut input_num = String::new();
+                std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+                let input_num = input_num.trim().parse::<usize>();
+                if let Err(_) = input_num {
+                    println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+                    return;
+                }
+                let input_num = input_num.unwrap();
+                if input_num > res.len() || input_num < 1 {
+                    println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+                    return;
+                }
+                let input_num = input_num - 1;
+                let res_acc = e[input_num].clone();
+                unsafe {
+                    TEMP_ACC.set_account(res_acc.get_name().as_str(), res_acc.get_uuid().as_str(), res_acc.get_access_token().as_str(), "", res_acc.get_client_token().as_str(), server, res_acc.get_base().as_str(), 3)
+                }
+            },
+            Err(e) => {
+                match e {
+                    -14 => {
+                        println!("{}", ansi_term::Color::Red.paint("无法获取第三方元数据网址，请确保你已连接网络。"));
+                        return;
+                    }
+                    -15 => {
+                        println!("{}", ansi_term::Color::Red.paint("账号或密码错误，或者是你登录次数过多而被暂时禁止登录，请稍后重试！"));
+                        return;
+                    }
+                    _ => {
+                        println!("{}{}", ansi_term::Color::Red.paint("出现了未知错误，请立即反馈给作者！错误代码："), e);
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    unsafe {
+        return TEMP_ACC.clone();
     }
 }
 pub fn add_microsoft() {
@@ -341,13 +443,73 @@ pub fn refresh_account() {
             acc_obj.insert(String::from("access_token"), serde_json::Value::String(rj.get_access_token()));
             acc_obj.insert(String::from("refresh_token"), serde_json::Value::String(rj.get_refresh_token()));
         }else if tp.eq("thirdparty") {
-            panic!("Not Support Thirdparty account refresh!");
+            let rs = acc.get("server").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let re = acc.get("access_token").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let rc = acc.get("client_token").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let rj = sr_thirdparty(rs, re, rc);
+            let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
+            let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
+            let acc_obj = acc_obj.get_mut(input_num).expect("JSON Parse Error!").as_object_mut().expect("JSON Parse Error!");
+            acc_obj.remove("access_token");
+            acc_obj.insert(String::from("access_token"), serde_json::Value::String(rj.get_access_token()));
         }else{
             panic!("Cannot solve AccountJSON type value!")
         }
     }
     save_account();
     println!("{}", ansi_term::Color::Green.paint("刷新成功！"));
+}
+pub fn add_thirdparty() {
+    println!("请输入你的外置登录服务器地址（填写示例：https://littleskin.cn/api/yggdrasil，必须以api/yggdrasil结尾并且末尾不能有/符号）：");
+    let mut input_ser = String::new();
+    std::io::stdin().read_line(&mut input_ser).expect("Cannot read stdin!");
+    input_ser = input_ser.trim().to_string();
+    if input_ser.is_empty() {
+        println!("{}", ansi_term::Color::Red.paint("外置登录服务器不能为空，请重新输入！"));
+        return;
+    }
+    println!("请输入你的外置登录账号（一般是邮箱）：");
+    let mut input_acc = String::new();
+    std::io::stdin().read_line(&mut input_acc).expect("Cannot read stdin!");
+    input_acc = input_acc.trim().to_string();
+    let regu = regex::Regex::new("^[A-Za-z0-9]+([-._][A-Za-z0-9]+)*@[A-Za-z0-9]+(-[A-Za-z0-9]+)*(.[A-Za-z]{2,6}|[A-Za-z]{2,4}.[A-Za-z]{2,3})$").unwrap();
+    if !regu.is_match(input_acc.as_str()) {
+        println!("{}", ansi_term::Color::Red.paint("外置登录账号不符合规范，请重新输入！"));
+        return;
+    }
+    println!("请输入你的外置登录密码：");
+    let mut input_pas = String::new();
+    std::io::stdin().read_line(&mut input_pas).expect("Cannot read stdin!");
+    input_pas = input_pas.trim().to_string();
+    if input_pas.is_empty() {
+        println!("{}", ansi_term::Color::Red.paint("外置登录密码不能为空，请重新输入！"));
+        return;
+    }
+    println!("请输入你的外置登录客户端密钥（如果没有可以不填，一般是标准的UUID形式）");
+    let mut input_clt = String::new();
+    std::io::stdin().read_line(&mut input_clt).expect("Cannot read stdin!");
+    input_clt = input_clt.trim().to_string();
+    let mut clt = String::new();
+    if !input_clt.is_empty() {
+        clt = input_clt.clone();
+    }
+    let acc = set_thirdparty(input_ser.as_str(), input_acc.as_str(), input_pas.as_str(), clt.as_str());
+    unsafe {
+        let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
+        let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
+        let mut push_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
+        let push_obj = push_obj.as_object_mut().unwrap();
+        push_obj.insert(String::from("type"), serde_json::Value::String(String::from("thirdparty")));
+        push_obj.insert(String::from("server"), serde_json::Value::String(input_ser.clone()));
+        push_obj.insert(String::from("name"), serde_json::Value::String(acc.get_name().clone()));
+        push_obj.insert(String::from("uuid"), serde_json::Value::String(acc.get_uuid().clone()));
+        push_obj.insert(String::from("access_token"), serde_json::Value::String(acc.get_access_token().clone()));
+        push_obj.insert(String::from("client_token"), serde_json::Value::String(acc.get_client_token().clone()));
+        push_obj.insert(String::from("base_code"), serde_json::Value::String(acc.get_base().clone()));
+        acc_obj.push(serde_json::Value::Object(push_obj.clone()));
+    }
+    save_account();
+    println!("{}", ansi_term::Color::Green.paint("添加成功！"));
 }
 pub fn choose_account() {
     unsafe {
@@ -396,7 +558,7 @@ pub fn choose_account() {
                 .get("uuid")
                 .expect("Parse JSON Error!")
                 .as_str()
-                .expect("Parse JSON Error!"), "", "", "", "", 1);
+                .expect("Parse JSON Error!"), "", "", "", "", "", 0);
         } else if t.eq("microsoft") {
             CURRENT_ACCOUNT.set_account(o
                 .get("name")
@@ -410,7 +572,7 @@ pub fn choose_account() {
                 .get("access_token")
                 .expect("Parse JSON Error!")
                 .as_str()
-                .expect("Parse JSON Error!"), "", "", "", 1);
+                .expect("Parse JSON Error!"), "", "", "", "", 1);
         } else if t.eq("thirdparty") {
             CURRENT_ACCOUNT.set_account(o
                 .get("name")
@@ -425,6 +587,10 @@ pub fn choose_account() {
                 .expect("Parse JSON Error!")
                 .as_str()
                 .expect("Parse JSON Error!"), "", o
+                .get("client_token")
+                .expect("Parse JSON Error!")
+                .as_str()
+                .expect("Parse JSON Error!"), o
                 .get("server")
                 .expect("Parse JSON Error!")
                 .as_str()
@@ -432,7 +598,7 @@ pub fn choose_account() {
                 .get("base_code")
                 .expect("Parse JSON Error!")
                 .as_str()
-                .expect("Parse JSON Error!"), 1);
+                .expect("Parse JSON Error!"), 2);
         } else {
             panic!("Cannot solve AccountJSON type value!")
         }

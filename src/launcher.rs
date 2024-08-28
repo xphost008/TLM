@@ -105,6 +105,6 @@ pub fn start_launch(option: crate::rust_lib::launcher_mod::LaunchOption){
     });
     if let Err(e) = catch {
         let cp = e.downcast_ref::<&str>();
-        println!("启动时参数检测无误，但是拼接参数时出现了错误！错误提示：\n{}", ansi_term::Color::Red.paint(format!("{}", cp.unwrap())));
+        println!("{}", ansi_term::Color::Red.paint(format!("{}{}", "启动时参数检测无误，但是拼接参数时出现了错误！错误提示：\n", cp.unwrap())));
     }
 }

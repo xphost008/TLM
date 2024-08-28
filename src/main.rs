@@ -1,5 +1,3 @@
-use clipboard::ClipboardProvider;
-
 mod rust_lib;
 mod launcher;
 mod main_method;
@@ -124,7 +122,7 @@ fn output_account() {
                     account::add_microsoft();
                 }
                 5 => {
-                    println!("暂未实现！");
+                    account::add_thirdparty();
                 }
                 6 => {
                     println!("暂未实现！");
@@ -403,75 +401,36 @@ fn launch_game(){
 }
 
 fn test(){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let login = rust_lib::account_mod::AccountLogin::new(privacy::MS_CLIENT_ID);
-        let (user_code, device_code) = login.get_user_code().await.unwrap();
-        println!("请复制你的用户代码，并将其粘贴到浏览器上：{}", user_code);
-        let mut cb: clipboard::ClipboardContext = clipboard::ClipboardProvider::new().unwrap();
-        cb.set_contents(user_code.to_owned()).unwrap();
-        std::process::Command::new("explorer.exe").arg("https://www.microsoft.com/link").spawn().expect("Some Error appear!");
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            let s = login.login_microsoft(device_code.clone()).await;
-            match s {
-                Ok(e) => {
-                    println!("{}\n{}\n{}\n{}",e.get_name(), e.get_uuid(), e.get_access_token(), e.get_refresh_token());
-                    break;
-                },
-                Err(e) => {
-                    match e {
-                        // -2错误是暂未完成登录，重新开始一次循环。因此不用捕获。
-                        -3 => {
-                            println!("登录超时（15分钟未完成登录），请重试！");
-                            break;
-                        },  
-                        // -4错误是刷新账号时出现的错误，这里不用捕获。
-                        -5 => {
-                            println!("在进行xbox登录时出现了错误，可能是没挂vβn的原因。");
-                            break;
-                        },
-                        -6 => {
-                            println!("在进行xsts登录时出现了错误，可能是没挂vβn的原因。");
-                            break;
-                        },
-                        -7 => {
-                            println!("在进行xsts登录时，由于该账户没有xbox账号，你可能需要自己注册一个。");
-                            break;
-                        },
-                        -8 => {
-                            println!("在进行xsts登录时，由于该国家/禁止被禁止，无法登录。");
-                            break;
-                        },
-                        -9 => {
-                            println!("该账号需要成人验证（韩国）。");
-                            break;
-                        },
-                        -10 => {
-                            println!("该账号设置未满18周岁，需要成人将该账户添加到家庭组中。");
-                            break;
-                        },
-                        -11 => {
-                            println!("你请求的xbox usercode与xsts usercode二者不一致，请重新尝试！");
-                            break;
-                        },
-                        -12 => {
-                            println!("在进行mc登录时出现了错误，可能是没挂vβn的原因。");
-                            break;
-                        },
-                        -13 => {
-                            println!("该账号暂未购买mc，请重新尝试！");
-                            break;
-                        }
-                        _ => {
-                            println!("出现了未知错误，请立即反馈给作者！错误代码：{}", e);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    });
+    // let rt = tokio::runtime::Runtime::new().unwrap();
+    // rt.spawn(async {
+    //     println!("Wait");
+    //     std::thread::sleep(std::time::Duration::from_secs(3));
+    //     println!("Ok");
+    // });
+    // rt.spawn(async {
+    //     println!("Wait2");
+    //     std::thread::sleep(std::time::Duration::from_secs(5));
+    //     println!("Ok2");
+    // });
+    // println!("Wide!");
+    // rt.block_on(async {
+    //     let aa = rust_lib::account_mod::AccountLogin::new_tp("https://littleskin.cn/api/yggdrasil");
+    //     let awa = aa.login_thirdparty(String::from("273020451@qq.com"), String::from("myc20050111"), String::new()).await;
+    //     match awa {
+    //         Ok(e) => {
+    //             for i in e.into_iter() {
+    //                 println!("{}", i.get_name());
+    //                 println!("{}", i.get_uuid());
+    //                 println!("{}", i.get_access_token());
+    //                 println!("{}", i.get_client_token());
+    //                 println!("{}", i.get_base());
+    //             }
+    //         },
+    //         Err(e) => {
+    //             println!("{}", e);
+    //         }
+    //     }
+    // });
 }
 fn load_plugin() {
     unsafe {
@@ -522,16 +481,16 @@ fn load_plugin() {
 }
 fn command_judge_launch(a: Vec<String>, is_panic: bool) {
     fn struct_to_launch(jiegou: account::AccountStruct) -> rust_lib::launcher_mod::LaunchAccount {
-        if jiegou.get_online() == 1 {
+        if jiegou.get_online() == 0 {
             rust_lib::launcher_mod::LaunchAccount::new_offline(
                 jiegou.get_name().as_str(),
                 jiegou.get_uuid().as_str())
-        } else if jiegou.get_online() == 2 {
+        } else if jiegou.get_online() == 1 {
             rust_lib::launcher_mod::LaunchAccount::new_microsoft(
                 jiegou.get_name().as_str(), 
                 jiegou.get_uuid().as_str(), 
                 jiegou.get_access_token().as_str())
-        } else if jiegou.get_online() == 3 {
+        } else if jiegou.get_online() == 2 {
             rust_lib::launcher_mod::LaunchAccount::new_thirdparty(
                 jiegou.get_name().as_str(), 
                 jiegou.get_uuid().as_str(), 
@@ -577,7 +536,7 @@ fn command_judge_launch(a: Vec<String>, is_panic: bool) {
                 }else{
                     account_user_uuid.push_str(a[i + 1].clone().as_str());
                 }
-                account.set_account(account_user_name.as_str(), account_user_uuid.as_str(), "", "", "", "", 1);
+                account.set_account(account_user_name.as_str(), account_user_uuid.as_str(), "", "", "", "", "", 1);
             }else if a.get(i + 1).expect("Cannot get account param!").clone().eq("Microsoft"){
                 let account_result = account::set_microsoft(privacy::MS_CLIENT_ID);
                 account.copy(account_result);
@@ -716,7 +675,6 @@ fn unsafe_init() {
         main_method::APP_DATA = appdata_dir.clone();
         let appdata_path = std::path::Path::new(appdata_dir.as_str());
         let appdata_path = appdata_path.join("TankLauncherModule");
-        let appdata_path = appdata_path.to_path_buf();
         let other_ini_path = appdata_path.join("Other.ini");
         let other_ini_path = other_ini_path.to_string_lossy().to_string();
         main_method::OTHER_INI.set_path(other_ini_path.as_str());
@@ -728,6 +686,10 @@ fn unsafe_init() {
         let tlm_ini_path = config_path.join("TankLauncherModule.ini");
         let tlm_path_str = tlm_ini_path.to_str().expect("Cannot get current exe dir!");
         main_method::TLM_INI.set_path(tlm_path_str);
+        let authlib_path = appdata_path.join("Authlib-Injector.jar");
+        if authlib_path.exists() && authlib_path.is_file() {
+            rust_lib::some_var::AUTHLIB_PATH = authlib_path.to_string_lossy().to_string();
+        }
         let account_json_path = appdata_path.join("AccountJSON.json");
         if !account_json_path.exists() {
             let acc = serde_json::from_str::<serde_json::Value>("{\"account\":[]}").unwrap();
@@ -759,7 +721,7 @@ fn unsafe_init() {
                         .get("uuid")
                         .expect("Config AccountJSON.json is error!")
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), "", "", "", "", 1);
+                        .expect("Config AccountJSON.json is error!"), "", "", "", "", "", 0);
                 } else if atype.eq("microsoft") {
                     account::CURRENT_ACCOUNT.set_account(current
                         .get("name")
@@ -773,7 +735,7 @@ fn unsafe_init() {
                         .get("access_token")
                         .expect("Config AccountJSON.json is error!")
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), "", "", "", 2);
+                        .expect("Config AccountJSON.json is error!"), "", "", "", "", 1);
                 } else if atype.eq("thirdparty") {
                     account::CURRENT_ACCOUNT.set_account(current
                         .get("name")
@@ -788,6 +750,10 @@ fn unsafe_init() {
                         .expect("Config AccountJSON.json is error!")
                         .as_str()
                         .expect("Config AccountJSON.json is error!"), "", current
+                        .get("client_token")
+                        .expect("Config AccountJSON.json is error!")
+                        .as_str()
+                        .expect("Config AccountJSON.json is error!"), current
                         .get("server")
                         .expect("Config AccountJSON.json is error!")
                         .as_str()
@@ -795,7 +761,7 @@ fn unsafe_init() {
                         .get("base_code")
                         .expect("Config AccountJSON.json is error!")
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), 3);
+                        .expect("Config AccountJSON.json is error!"), 2);
                 } else {
                     panic!("Cannot solve AccountJSON type value")
                 }
