@@ -421,8 +421,7 @@ fn test(){
 fn load_plugin() {
     unsafe {
         let pp = std::path::Path::new(main_method::CURRENT_DIR.as_str());
-        let pp = pp.join("TankLauncherModule");
-        let pp = pp.join("plugins");
+        let pp = pp.join("TankLauncherModule").join("plugins");
         if !pp.exists() || pp.exists() && pp.is_file() {
             std::fs::create_dir_all(pp.clone()).expect("Cannot create dir!");
         }
@@ -668,17 +667,12 @@ fn command_judge_launch(a: Vec<String>, is_panic: bool) {
 }
 fn unsafe_init() {
     unsafe {
-        let appdata_dir = dirs::data_dir().expect("Cannot get AppData dir!");
-        let appdata_dir = appdata_dir.as_path().display().to_string();
+        let appdata_dir = dirs::data_dir().expect("Cannot get AppData dir!").as_path().display().to_string();
         main_method::APP_DATA = appdata_dir.clone();
-        let appdata_path = std::path::Path::new(appdata_dir.as_str());
-        let appdata_path = appdata_path.join("TankLauncherModule");
-        let other_ini_path = appdata_path.join("Other.ini");
-        let other_ini_path = other_ini_path.to_string_lossy().to_string();
+        let appdata_path = std::path::Path::new(appdata_dir.as_str()).join("TankLauncherModule");
+        let other_ini_path = appdata_path.join("Other.ini").to_string_lossy().to_string();
         main_method::OTHER_INI.set_path(other_ini_path.as_str());
-        let current_path = std::env::current_exe().expect("Cannot get current exe dir!");
-        let current_path = current_path.parent().expect("Cannot get current exe dir!");
-        let current_path = current_path.to_path_buf();
+        let current_path = std::env::current_exe().expect("Cannot get current exe dir!").parent().expect("Cannot get current exe dir!").to_path_buf();
         main_method::CURRENT_DIR = current_path.to_string_lossy().to_string();
         let config_path = std::path::Path::new(current_path.as_path()).join("TankLauncherModule").join("configs");
         let tlm_ini_path = config_path.join("TankLauncherModule.ini");
