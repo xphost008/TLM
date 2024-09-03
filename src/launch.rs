@@ -13,10 +13,9 @@ pub static mut CURRENT_VERSION: String = String::new();
 
 fn add_java_simple(path: String) -> bool {
     unsafe {
-        let java_obj = JAVA_JSON.get_mut("java").expect("Cannot Parse Java JSON");
-        let java_obj = java_obj.as_array_mut().expect("Cannot Parse Java JSON");
+        let java_obj = JAVA_JSON["java"].as_array_mut().expect("Cannot Parse Java JSON");
         for i in java_obj.iter() {
-            let j = i.get("path").expect("Cannot Parse Java JSON").as_str().expect("Cannot Parse Java JSON");
+            let j = i["path"].as_str().expect("Cannot Parse Java JSON");
             if j.eq(path.as_str()) {
                 return true;
             }
@@ -218,14 +217,13 @@ pub fn check_launch(){
 
 pub fn choose_java() {
     unsafe {
-        let java_obj = JAVA_JSON.get("java").expect("Cannot read java json!");
-        let java_obj = java_obj.as_array().expect("Cannot read java json!");
+        let java_obj = JAVA_JSON["java"].as_array().expect("Cannot read java json!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..java_obj.len() {
             let j = java_obj[i].as_object().expect("Cannot read java json!");
-            let p = j.get("path").expect("Cannot read java json!").as_str().expect("Cannot read java json!");
-            let b = j.get("bits").expect("Cannot read java json!").as_str().expect("Cannot read java json!");
-            let v = j.get("version").expect("Cannot read java json!").as_str().expect("Cannot read java json!");
+            let p = j["path"].as_str().expect("Cannot read java json!");
+            let b = j["bits"].as_str().expect("Cannot read java json!");
+            let v = j["version"].as_str().expect("Cannot read java json!");
             res.push(format!("{}. (Java {} x{}) {}", (i + 1).to_string(), v, b, p));
         }
         if res.len() == 0 {
@@ -263,14 +261,13 @@ pub fn choose_java() {
 
 pub fn remove_java() {
     unsafe {
-        let java_obj = JAVA_JSON.get_mut("java").expect("Cannot read java json!");
-        let java_obj = java_obj.as_array_mut().expect("Cannot read java json!");
+        let java_obj = JAVA_JSON["java"].as_array_mut().expect("Cannot read java json!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..java_obj.len() {
             let j = java_obj[i].as_object().expect("Cannot read java json!");
-            let p = j.get("path").expect("Cannot read java json!").as_str().expect("Cannot read java json!");
-            let b = j.get("bits").expect("Cannot read java json!").as_str().expect("Cannot read java json!");
-            let v = j.get("version").expect("Cannot read java json!").as_str().expect("Cannot read java json!");
+            let p = j["path"].as_str().expect("Cannot read java json!");
+            let b = j["bits"].as_str().expect("Cannot read java json!");
+            let v = j["version"].as_str().expect("Cannot read java json!");
             res.push(format!("{}. (Java {} x{}) {}", (i + 1).to_string(), v, b, p));
         }
         if res.len() == 0 {

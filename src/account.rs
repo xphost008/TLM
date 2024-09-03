@@ -1,7 +1,5 @@
 use clipboard::ClipboardProvider;
 
-use crate::privacy;
-
 pub static mut ACCOUNT_JSON: serde_json::Value = serde_json::Value::Null;
 pub static mut CHOOSE_ACCOUNT: i32 = -1;
 pub static mut CURRENT_ACCOUNT: AccountStruct = AccountStruct::new();
@@ -79,6 +77,16 @@ impl AccountStruct {
         self.online = copy.get_online();
     }
 }
+pub fn check_account() {
+    unsafe {
+        let name = CURRENT_ACCOUNT.get_name();
+        let uuid = CURRENT_ACCOUNT.get_uuid();
+        if name.is_empty() || uuid.is_empty() {
+            println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任意账号噢！请选择一个再试试吧！"))
+        }
+        println!("您当前选择的账号名称是：\n{}\n账号UUID是：\n{}", name, uuid);
+    }
+}
 fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -88,7 +96,7 @@ fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
         match s {
             Ok(e) => {
                 unsafe {
-                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 2);
+                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 1);
                 }
             },
             Err(e) => {
@@ -151,12 +159,12 @@ fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
 }
 pub fn remove_account() {
     unsafe {
-        let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!").as_array_mut().expect("JSON Parse Error!");
+        let acc_obj = ACCOUNT_JSON["account"].as_array_mut().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..acc_obj.len() {
-            let j = acc_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
-            let o = j.get("type").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let j = acc_obj[i].clone();
+            let n = j["name"].as_str().expect("JSON Parse Error!");
+            let o = j["type"].as_str().expect("JSON Parse Error!");
             let o = if o.eq("offline") { "（离线）" } else if o.eq("microsoft") { "（微软）" } else if o.eq("thirdparty") { "（外置）" } else { panic!("Cannot solve AccountJSON type value!") };
             res.push(format!("{}. {} {}", i + 1, o, n));
         }
@@ -211,7 +219,7 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
             match s {
                 Ok(e) => {
                     unsafe {
-                        TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 2);
+                        TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 1);
                     }
                     break;
                 },
@@ -285,7 +293,7 @@ fn sr_thirdparty(server: &str, access_token: &str, client_token: &str) -> Accoun
         match s {
             Ok(e) => {
                 unsafe {
-                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), "", e.get_client_token().as_str(), server, e.get_base().as_str(), 3);
+                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), "", e.get_client_token().as_str(), server, e.get_base().as_str(), 2);
                 }
             },
             Err(e) => {
@@ -346,7 +354,7 @@ pub fn set_thirdparty(server: &str, username: &str, password: &str, client_token
                 let input_num = input_num - 1;
                 let res_acc = e[input_num].clone();
                 unsafe {
-                    TEMP_ACC.set_account(res_acc.get_name().as_str(), res_acc.get_uuid().as_str(), res_acc.get_access_token().as_str(), "", res_acc.get_client_token().as_str(), server, res_acc.get_base().as_str(), 3)
+                    TEMP_ACC.set_account(res_acc.get_name().as_str(), res_acc.get_uuid().as_str(), res_acc.get_access_token().as_str(), "", res_acc.get_client_token().as_str(), server, res_acc.get_base().as_str(), 2)
                 }
             },
             Err(e) => {
@@ -373,7 +381,7 @@ pub fn set_thirdparty(server: &str, username: &str, password: &str, client_token
 }
 pub fn add_microsoft() {
     //使用tokio执行异步程序，但是阻塞了主线程。
-    let acc = set_microsoft(privacy::MS_CLIENT_ID);
+    let acc = set_microsoft(crate::privacy::MS_CLIENT_ID);
     unsafe {
         let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
         let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
@@ -391,12 +399,12 @@ pub fn add_microsoft() {
 }
 pub fn refresh_account() {
     unsafe {
-        let acc_obj = ACCOUNT_JSON.get("account").expect("JSON Parse Error!").as_array().expect("JSON Parse Error!");
+        let acc_obj = ACCOUNT_JSON["account"].as_array().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..acc_obj.len() {
-            let j = acc_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
-            let o = j.get("type").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let j = acc_obj[i].clone();
+            let n = j["name"].as_str().expect("JSON Parse Error!");
+            let o = j["type"].as_str().expect("JSON Parse Error!");
             let o = if o.eq("offline") { "（离线）" } else if o.eq("microsoft") { "（微软）" } else if o.eq("thirdparty") { "（外置）" } else { panic!("Cannot solve AccountJSON type value!") };
             res.push(format!("{}. {} {}", i + 1, o, n));
         }
@@ -430,7 +438,7 @@ pub fn refresh_account() {
             return;
         }else if tp.eq("microsoft") {
             let re = acc.get("refresh_token").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
-            let rj = sr_microsoft(privacy::MS_CLIENT_ID, re);
+            let rj = sr_microsoft(crate::privacy::MS_CLIENT_ID, re);
             let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
             let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
             let acc_obj = acc_obj.get_mut(input_num).expect("JSON Parse Error!").as_object_mut().expect("JSON Parse Error!");
@@ -477,9 +485,8 @@ pub fn add_thirdparty() {
         println!("{}", ansi_term::Color::Red.paint("外置登录账号不符合规范，请重新输入！"));
         return;
     }
-    println!("请输入你的外置登录密码：");
-    let mut input_pas = String::new();
-    std::io::stdin().read_line(&mut input_pas).expect("Cannot read stdin!");
+    println!("请输入你的外置登录密码（不会显示）：");
+    let mut input_pas = rpassword::read_password().expect("Cannot read stdin!");
     input_pas = input_pas.trim().to_string();
     if input_pas.is_empty() {
         println!("{}", ansi_term::Color::Red.paint("外置登录密码不能为空，请重新输入！"));
@@ -513,12 +520,12 @@ pub fn add_thirdparty() {
 }
 pub fn choose_account() {
     unsafe {
-        let acc_obj = ACCOUNT_JSON.get("account").expect("JSON Parse Error!").as_array().expect("JSON Parse Error!");
+        let acc_obj = ACCOUNT_JSON["account"].as_array().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..acc_obj.len() {
-            let j = acc_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
-            let o = j.get("type").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let j = acc_obj[i].clone();
+            let n = j["name"].as_str().expect("JSON Parse Error!");
+            let o = j["type"].as_str().expect("JSON Parse Error!");
             let o = if o.eq("offline") { "（离线）" } else if o.eq("microsoft") { "（微软）" } else if o.eq("thirdparty") { "（外置）" } else { panic!("Cannot solve AccountJSON type value!") };
             res.push(format!("{}. {} {}", i + 1, o, n));
         }
@@ -550,53 +557,31 @@ pub fn choose_account() {
         let o = acc_obj[input_num].as_object().unwrap();
         let t = o["type"].as_str().unwrap();
         if t.eq("offline") {
-            CURRENT_ACCOUNT.set_account(o
-                .get("name")
-                .expect("Parse JSON Error!")
+            CURRENT_ACCOUNT.set_account(o["name"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("uuid")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["uuid"]
                 .as_str()
                 .expect("Parse JSON Error!"), "", "", "", "", "", 0);
         } else if t.eq("microsoft") {
-            CURRENT_ACCOUNT.set_account(o
-                .get("name")
-                .expect("Parse JSON Error!")
+            CURRENT_ACCOUNT.set_account(o["name"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("uuid")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["uuid"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("access_token")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["access_token"]
                 .as_str()
                 .expect("Parse JSON Error!"), "", "", "", "", 1);
         } else if t.eq("thirdparty") {
-            CURRENT_ACCOUNT.set_account(o
-                .get("name")
-                .expect("Parse JSON Error!")
+            CURRENT_ACCOUNT.set_account(o["name"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("uuid")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["uuid"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("access_token")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["access_token"]
                 .as_str()
-                .expect("Parse JSON Error!"), "", o
-                .get("client_token")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), "", o["client_token"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("server")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["server"]
                 .as_str()
-                .expect("Parse JSON Error!"), o
-                .get("base_code")
-                .expect("Parse JSON Error!")
+                .expect("Parse JSON Error!"), o["base_code"]
                 .as_str()
                 .expect("Parse JSON Error!"), 2);
         } else {

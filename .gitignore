@@ -1,3 +1,6 @@
+# 忽略构建文件
 /target
 /.idea
+
+# 忽略私有函数
 /src/privacy.rs

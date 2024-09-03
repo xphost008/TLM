@@ -91,13 +91,7 @@ pub fn reload_version() {
         let ver_root = VERSION_SEL_JSON.get_mut("mcsel").expect("Cannot get mcsel!").as_array_mut().expect("Cannot get mcsel");
         ver_root.clear();
         let mc_root = VERSION_JSON.as_object().unwrap();
-        let path = mc_root
-                .get("mc")
-                .expect("Cannot get mc path pairs!")
-                .get(CHOOSE_VERSION as usize)
-                .expect("Cannot get mc path pairs!")
-                .get("path")
-                .expect("Cannot get mc path pairs!")
+        let path = mc_root["mc"][CHOOSE_VERSION as usize]["path"]
                 .as_str()
                 .expect("Cannot get mc path pairs!");
         let ver = format!("{}\\versions", path);
@@ -116,15 +110,12 @@ pub fn reload_version() {
 }
 pub fn rename_root() {
     unsafe {
-        let ver_obj = VERSION_JSON.get_mut("mc").expect("JSON Parse Error!");
-        let ver_obj = ver_obj.as_array_mut().expect("JSON Parse Error!");
+        let ver_obj = VERSION_JSON["mc"].as_array_mut().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
             let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!");
-            let n = n.as_str().expect("JSON Parse Error!");
-            let p = p.as_str().expect("JSON Parse Error!");
+            let n = j["name"].as_str().expect("JSON Parse Error!");
+            let p = j["path"].as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {} - {}", i + 1, n, p));
         }
         if res.len() == 0 {
@@ -163,15 +154,12 @@ pub fn rename_root() {
 }
 pub fn remove_root() {
     unsafe {
-        let ver_obj = VERSION_JSON.get_mut("mc").expect("JSON Parse Error!");
-        let ver_obj = ver_obj.as_array_mut().expect("JSON Parse Error!");
+        let ver_obj = VERSION_JSON["mc"].as_array_mut().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
-            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!");
-            let n = n.as_str().expect("JSON Parse Error!");
-            let p = p.as_str().expect("JSON Parse Error!");
+            let j = ver_obj[i].clone();
+            let n = j["name"].as_str().expect("JSON Parse Error!");
+            let p = j["path"].as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {} - {}", i + 1, n, p));
         }
         if res.len() == 0 {
@@ -215,14 +203,11 @@ pub fn remove_root() {
 }
 pub fn rename_version() {
     unsafe {
-        let ver_obj = VERSION_SEL_JSON.as_object().expect("JSON Parse Error!");
-        let ver_obj = ver_obj.get("mcsel").expect("JSON Parse Error!");
-        let ver_obj = ver_obj.as_array().expect("JSON Parse Error!");
+        let ver_obj = VERSION_SEL_JSON["mcsel"].as_array().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
-            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!");
-            let p = p.as_str().expect("JSON Parse Error!");
+            let j = ver_obj[i].clone();
+            let p = j["path"].as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {}", i + 1, p));
         }
         if res.len() == 0 {
@@ -263,10 +248,8 @@ pub fn rename_version() {
                 return;
             }
         }
-        let path = ver_obj[input_num]["path"].as_str().unwrap();
-        let path = format!("{}\\versions\\{}", CURRENT_VERSION.clone(), path);
-        let path = path.as_str();
-        let path = std::path::Path::new(path);
+        let path = format!("{}\\versions\\{}", CURRENT_VERSION.clone(), ver_obj[input_num]["path"].as_str().unwrap());
+        let path = std::path::Path::new(path.as_str());
         let parent = path.parent().unwrap();
         let path2 = parent.join(input_str);
         let path2 = path2.as_path();
@@ -277,14 +260,11 @@ pub fn rename_version() {
 }
 pub fn remove_version() {
     unsafe {
-        let ver_obj = VERSION_SEL_JSON.as_object().expect("JSON Parse Error!");
-        let ver_obj = ver_obj.get("mcsel").expect("JSON Parse Error!");
-        let ver_obj = ver_obj.as_array().expect("JSON Parse Error!");
+        let ver_obj = VERSION_SEL_JSON["mcsel"].as_array().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
-            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!");
-            let p = p.as_str().expect("JSON Parse Error!");
+            let j = ver_obj[i].clone();
+            let p = j["path"].as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {}", i + 1, p));
         }
         if res.len() == 0 {
@@ -310,8 +290,7 @@ pub fn remove_version() {
             return;
         }
         let input_num = input_num - 1;
-        let path = ver_obj[input_num]["path"].as_str().unwrap();
-        let path = format!("{}\\versions\\{}", CURRENT_VERSION.clone(), path);
+        let path = format!("{}\\versions\\{}", CURRENT_VERSION.clone(), ver_obj[input_num]["path"].as_str().unwrap());
         let path = path.as_str();
         std::fs::remove_dir_all(path).expect("Cannot remove version dir!");
         if (input_num as i32) < CHOOSE_VERSION_SEL {
@@ -332,13 +311,11 @@ pub fn choose_version() {
             println!("{}", ansi_term::Color::Yellow.paint("你还暂未添加任意文件夹哦！请添加一个再来！"));
             return;
         }
-        let ver_obj = VERSION_SEL_JSON.as_object().expect("JSON Parse Error!");
-        let ver_obj = ver_obj.get("mcsel").expect("JSON Parse Error!");
-        let ver_obj = ver_obj.as_array().expect("JSON Parse Error!");
+        let ver_obj = VERSION_SEL_JSON["mcsel"].as_array().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
-            let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let j = ver_obj[i].clone();
+            let p = j["path"].as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {}", i + 1, p));
         }
         if res.len() == 0 {
@@ -372,13 +349,12 @@ pub fn choose_version() {
 }
 pub fn choose_root() {
     unsafe {
-        let ver_obj = VERSION_JSON.get("mc").expect("JSON Parse Error!");
-        let ver_obj = ver_obj.as_array().expect("JSON Parse Error!");
+        let ver_obj = VERSION_JSON["mc"].as_array().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..ver_obj.len() {
             let j = ver_obj[i].as_object().expect("JSON Parse Error!");
-            let n = j.get("name").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
-            let p = j.get("path").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
+            let n = j["name"].as_str().expect("JSON Parse Error!");
+            let p = j["path"].as_str().expect("JSON Parse Error!");
             res.push(format!("{}. {} - {}", i + 1, n, p));
         }
         if res.len() == 0 {

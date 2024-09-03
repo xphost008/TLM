@@ -107,7 +107,7 @@ fn output_account() {
         if let Ok(t) = conv {
             match t {
                 0 => {
-                    println!("暂未实现！");
+                    account::check_account();
                 },
                 1 => {
                     account::choose_account();
@@ -290,26 +290,22 @@ fn output_help(){
     println!("  -gd | --gameDir <设置/启动游戏根目录，有默认值=-1>");
     println!("                  （仅支持[值]为：【游戏目录路径、数字】）");
     println!("                  （如果是路径，则请输入完整的游戏目录路径）");
-    println!("                  （如果是数字，请输入一个可用的索引）");
     println!("                  （如果目录不存在则会输出回显【gameDir Not Found】）");
     println!("  -v | --version <设置/启动游戏版本，有默认值=-1>");
     println!("                  （仅支持[值]为：【游戏版本名称、数字】）");
     println!("                  （如果是游戏版本名称，则请输入完整的/versions/<版本名称>中的版本名称字段）");
-    println!("                  （如果是数字，请输入一个可用的索引）");
     println!("                  （如果版本不存在则会输出回显【version Not Found】）");
     println!("  -jp | --javaPath <设置/启动游戏Java路径>，有默认值=-1");
     println!("                  （此处可以填入【Java路径、数字】）");
     println!("                  （如果是路径，则请输入完整的Java路径）");
-    println!("                  （如果是数字，请输入一个可用的索引）");
     println!("                  （如果Java不存在则会输出回显【javaPath Not Found】）");
     println!("  -a | --account <设置/启动游戏账号，有默认值=-1>");
     println!("                  （仅支持[值]为：【Offline、Microsoft、ThirdParty、数字】）");
     println!("                  （如果是Offline，则后面跟玩家用户名和UUID。如果UUID不想手动填可以填default）");
     println!("                  （如果是Microsoft，则会直接要求重新登录一次，按照要求登录即可！）");
-    println!("                  （如果是ThirdParty，则后面要求填入【1. 服务器、2. 账号、3. 密码、4. 角色序号】！）");
-    println!("                  （如果是仅数字，请输入一个可用的索引）");
-    println!("                  （如果在填入仅数字的时候，账号access_token已过期，则会自动调用refresh_token进行重置。如果refresh_token也过期了，则会爆出【account Is Expire】。）");
-    println!("                  （如果在填入仅数字的时候，账号索引超出范围或者不存在，则会输出回显【account Not Found】）");
+    println!("                  （如果是ThirdParty，则后面要求填入【1. 服务器、2. 账号、3. 密码、4. clientToken（如果有则填，没有则填default）】！）");
+    println!("                  （其中，在登录外置登录时，会提示需要输入一个值作为你要登录的角色。请注意！");
+    println!("                  （如果账号格式不对，则会输出回显【account is appear!】）");
     println!("  -w | --width <设置窗口宽度，有默认值=854>");
     println!("  -h | --height <设置窗口高度，有默认值=480>");
     println!("  -nm | --minMemory <设置游戏最小内存，有默认值=256>");
@@ -401,36 +397,26 @@ fn launch_game(){
 }
 
 fn test(){
-    // let rt = tokio::runtime::Runtime::new().unwrap();
-    // rt.spawn(async {
-    //     println!("Wait");
-    //     std::thread::sleep(std::time::Duration::from_secs(3));
-    //     println!("Ok");
-    // });
-    // rt.spawn(async {
-    //     println!("Wait2");
-    //     std::thread::sleep(std::time::Duration::from_secs(5));
-    //     println!("Ok2");
-    // });
-    // println!("Wide!");
-    // rt.block_on(async {
-    //     let aa = rust_lib::account_mod::AccountLogin::new_tp("https://littleskin.cn/api/yggdrasil");
-    //     let awa = aa.login_thirdparty(String::from("273020451@qq.com"), String::from("myc20050111"), String::new()).await;
-    //     match awa {
-    //         Ok(e) => {
-    //             for i in e.into_iter() {
-    //                 println!("{}", i.get_name());
-    //                 println!("{}", i.get_uuid());
-    //                 println!("{}", i.get_access_token());
-    //                 println!("{}", i.get_client_token());
-    //                 println!("{}", i.get_base());
-    //             }
-    //         },
-    //         Err(e) => {
-    //             println!("{}", e);
-    //         }
-    //     }
-    // });
+    // let rpass = rpassword::read_password().unwrap();
+    // println!("{}", rpass);
+    // let raw = std::process::Command::new("cmd")
+    //     .arg("/c")
+    //     .args(["wmic", "csproduct"])
+    //     .output();
+    // if let Err(_) = raw {
+    //     return;
+    // }
+    // use crypto::digest::Digest;
+    // let raw = String::from_utf8(raw.unwrap().stdout).unwrap();
+    // let mut sha = crypto::sha2::Sha224::new();
+    // sha.input_str(raw.as_str());
+    // let res = sha.result_str();
+    // println!("{}", res);
+    // let n1 = privacy::encrypt(res.as_str(), 1);
+    // let n2 = privacy::encrypt(res.as_str(), 2);
+    // let n3 = privacy::encrypt(res.as_str(), 3);
+    // println!("{}\n{}\n{}\n{}", "您的解锁码是：", n1, n2, n3);
+    // println!("{}\n{}\n{}\n{}", "您的原密钥是：", privacy::decrypt(n1.as_str(), 1), privacy::decrypt(n2.as_str(), 2), privacy::decrypt(n3.as_str(), 3))
 }
 fn load_plugin() {
     unsafe {
@@ -536,9 +522,21 @@ fn command_judge_launch(a: Vec<String>, is_panic: bool) {
                 }else{
                     account_user_uuid.push_str(a[i + 1].clone().as_str());
                 }
-                account.set_account(account_user_name.as_str(), account_user_uuid.as_str(), "", "", "", "", "", 1);
+                account.set_account(account_user_name.as_str(), account_user_uuid.as_str(), "", "", "", "", "", 0);
             }else if a.get(i + 1).expect("Cannot get account param!").clone().eq("Microsoft"){
                 let account_result = account::set_microsoft(privacy::MS_CLIENT_ID);
+                account.copy(account_result);
+            }else if a.get(i + 1).expect("Cannot get account param!").clone().eq("ThirdParty") {
+                i += 1;
+                let account_server = a.get(i + 1).expect("Cannot get user name param!").clone();
+                i += 1;
+                let account_username = a.get(i + 1).expect("Cannot get user name param!").clone();
+                i += 1;
+                let account_password = a.get(i + 1).expect("Cannot get user name param!").clone();
+                i += 1;
+                let account_client_token = a.get(i + 1).expect("Cannot get user name param!");
+                let account_client_token = if account_client_token.eq("default") { String::new() } else { account_client_token.clone() };
+                let account_result = account::set_thirdparty(account_server.as_str(), account_username.as_str(), account_password.as_str(), account_client_token.as_str());
                 account.copy(account_result);
             }
             i += 1;
@@ -702,64 +700,36 @@ fn unsafe_init() {
             let acc = acc.as_object().expect("Config AccountJSON.json is error!");
             account::CHOOSE_ACCOUNT = main_method::OTHER_INI.read_int("Account", "SelectAccount", -1);
             if account::CHOOSE_ACCOUNT != -1 {
-                let current = acc
-                    .get("account")
-                    .expect("Config AccountJSON.json is error!")
-                    .get(account::CHOOSE_ACCOUNT as usize)
-                    .expect("Config AccountJSON.json is error!");
-                let atype = current
-                    .get("type")
-                    .expect("Config AccountJSON.json is error!")
+                let current = acc["account"][account::CHOOSE_ACCOUNT as usize].clone();
+                let atype = current["type"]
                     .as_str()
                     .expect("Config AccountJSON.json is error!");
                 if atype.eq("offline") {
-                    account::CURRENT_ACCOUNT.set_account(current
-                        .get("name")
-                        .expect("Config AccountJSON.json is error!")
+                    account::CURRENT_ACCOUNT.set_account(current["name"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("uuid")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["uuid"]
                         .as_str()
                         .expect("Config AccountJSON.json is error!"), "", "", "", "", "", 0);
                 } else if atype.eq("microsoft") {
-                    account::CURRENT_ACCOUNT.set_account(current
-                        .get("name")
-                        .expect("Config AccountJSON.json is error!")
+                    account::CURRENT_ACCOUNT.set_account(current["name"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("uuid")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["uuid"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("access_token")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["access_token"]
                         .as_str()
                         .expect("Config AccountJSON.json is error!"), "", "", "", "", 1);
                 } else if atype.eq("thirdparty") {
-                    account::CURRENT_ACCOUNT.set_account(current
-                        .get("name")
-                        .expect("Config AccountJSON.json is error!")
+                    account::CURRENT_ACCOUNT.set_account(current["name"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("uuid")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["uuid"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("access_token")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["access_token"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), "", current
-                        .get("client_token")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), "", current["client_token"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("server")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["server"]
                         .as_str()
-                        .expect("Config AccountJSON.json is error!"), current
-                        .get("base_code")
-                        .expect("Config AccountJSON.json is error!")
+                        .expect("Config AccountJSON.json is error!"), current["base_code"]
                         .as_str()
                         .expect("Config AccountJSON.json is error!"), 2);
                 } else {
@@ -777,16 +747,12 @@ fn unsafe_init() {
         }else{
             let ver = rust_lib::main_mod::get_file(mc_json_path.to_str().unwrap()).expect("Config MCJSON.json is error!");
             let ver = serde_json::from_str::<serde_json::Value>(ver.as_str()).expect("Config MCJSON.json is error!");
-            let ver = ver.as_object().expect("Config MCJSON.json is error!");
             version::CHOOSE_VERSION = main_method::TLM_INI.read_int("MC", "SelectMC", -1);
             if version::CHOOSE_VERSION != -1 {
-                let current = ver.get("mc").expect("Config MCJSON.json is error!");
-                let current = current.get(version::CHOOSE_VERSION as usize).expect("Config MCJSON.json is error!");
-                let current = current.get("path").expect("Config MCJSON.json is error!");
-                let current = current.as_str().expect("Config MCJSON.json is error!");
+                let current = ver["mc"][version::CHOOSE_VERSION as usize]["path"].as_str().expect("Config MCJSON.json is error!");
                 version::CURRENT_VERSION = current.to_string();
             }
-            version::VERSION_JSON = serde_json::Value::Object(ver.clone());
+            version::VERSION_JSON = ver.clone();
         }
         let mc_sel_path = config_path.join("MCSelJSON.json");
         if !mc_sel_path.exists(){
@@ -797,16 +763,12 @@ fn unsafe_init() {
         }else{
             let ver = rust_lib::main_mod::get_file(mc_sel_path.to_str().unwrap()).expect("Config MCSelJSON.json is error!");
             let ver = serde_json::from_str::<serde_json::Value>(ver.as_str()).expect("Config MCSelJSON.json is error!");
-            let ver = ver.as_object().expect("Config MCSelJSON.json is error!");
             version::CHOOSE_VERSION_SEL = main_method::TLM_INI.read_int("MC", "SelectVer", -1);
             if version::CHOOSE_VERSION_SEL != -1 {
-                let current = ver.get("mcsel").expect("Config MCJSON.json is error!");
-                let current = current.get(version::CHOOSE_VERSION_SEL as usize).expect("Config MCJSON.json is error!");
-                let current = current.get("path").expect("Config MCJSON.json is error!");
-                let current = current.as_str().expect("Config MCJSON.json is error!");
+                let current = ver["mcsel"][version::CHOOSE_VERSION_SEL as usize]["path"].as_str().expect("Config MCJSON.json is error!");
                 version::CURRENT_VERSION_SEL = current.to_string();
             }
-            version::VERSION_SEL_JSON = serde_json::Value::Object(ver.clone());
+            version::VERSION_SEL_JSON = ver.clone();
         }
         version::reload_version();
         let java_path = config_path.join("JavaJSON.json");
@@ -818,13 +780,11 @@ fn unsafe_init() {
         } else {
             let java = rust_lib::main_mod::get_file(java_path.to_str().unwrap()).expect("Config JavaJSON.json is error!");
             let java = serde_json::from_str::<serde_json::Value>(java.as_str()).expect("Config JavaJSON.json is error!");
-            let java = java.as_object().expect("Config MCSelJSON.json is error!");
             launch::CHOOSE_JAVA = main_method::TLM_INI.read_int("Java", "SelectJava", -1);
             if launch::CHOOSE_JAVA != -1 {
-                let current = java.get("java").expect("Config JavaJSON.json is error!");
-                let current = current.get(launch::CHOOSE_JAVA as usize).expect("Config JavaJSON.json is error!");
-                let current_path = current.get("path").expect("Config JavaJSON.json is error!");
-                let current_path = current_path.as_str().expect("Config JavaJSON.json is error!");
+                let current = java["java"][launch::CHOOSE_JAVA as usize].as_object().expect("Config JavaJSON.json is error!");
+                let current_path = current.get("path").expect("Config JavaJSON.json is error!")
+                                                .as_str().expect("Config JavaJSON.json is error!");
                 launch::CURRENT_JAVA = current_path.to_string();
                 let current_bits = current.get("bits").expect("Config JavaJSON.json is error!")
                                                 .as_str().expect("Config JavaJSON.json is error!");
@@ -833,7 +793,7 @@ fn unsafe_init() {
                                             .as_str().expect("Config JavaJSON.json is error!");
                 launch::CURRENT_VERSION = current_bits.to_string();
             }
-            launch::JAVA_JSON = serde_json::Value::Object(java.clone());
+            launch::JAVA_JSON = java.clone();
         }
         let iso = main_method::TLM_INI.read_int("Version", "SelectIsolation", 4);
         if iso > 4 || iso < 1 {
