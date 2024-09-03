@@ -3,7 +3,7 @@ use mlua::prelude::*;
 pub fn load_lua_plugin(path: &str) -> LuaResult<()>{
     let l = Lua::new();
     let f = l.create_function(|_: &Lua, key: String| -> LuaResult<String> {
-        Ok(crate::privacy::encrypt(key.as_str(), 4))
+        Ok(crate::privacy::encrypt(key.as_str(), 5))
     });
     let g = l.create_function(|_: &Lua, ()| -> LuaResult<String> {
         Ok(crate::privacy::gen_mechine_code())
