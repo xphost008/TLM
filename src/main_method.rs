@@ -1,4 +1,6 @@
-pub static mut APP_DATA: String = String::new();
-pub static mut CURRENT_DIR: String = String::new();
-pub static mut TLM_INI: crate::read_ini::IniFile = crate::read_ini::IniFile::new();
-pub static mut OTHER_INI: crate::read_ini::IniFile = crate::read_ini::IniFile::new();
+thread_local! {
+    pub static APP_DATA: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static CURRENT_DIR: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static TLM_INI: std::cell::RefCell<crate::read_ini::IniFile> = std::cell::RefCell::new(crate::read_ini::IniFile::new());
+    pub static OTHER_INI: std::cell::RefCell<crate::read_ini::IniFile> = std::cell::RefCell::new(crate::read_ini::IniFile::new());
+}

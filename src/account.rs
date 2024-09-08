@@ -1,10 +1,10 @@
-use clipboard::ClipboardProvider;
-
-pub static mut ACCOUNT_JSON: serde_json::Value = serde_json::Value::Null;
-pub static mut CHOOSE_ACCOUNT: i32 = -1;
-pub static mut CURRENT_ACCOUNT: AccountStruct = AccountStruct::new();
-
-static mut TEMP_ACC: AccountStruct = AccountStruct::new();
+thread_local! {
+    pub static ACCOUNT_JSON: std::cell::RefCell<serde_json::Value> = std::cell::RefCell::new(serde_json::Value::Null);
+    pub static CHOOSE_ACCOUNT: std::cell::RefCell<i32> = std::cell::RefCell::new(-1);
+    pub static CURRENT_ACCOUNT: std::cell::RefCell<AccountStruct> = std::cell::RefCell::new(AccountStruct::new());
+    //临时
+    pub static TEMP_ACC: std::cell::RefCell<AccountStruct> = std::cell::RefCell::new(AccountStruct::new());
+}
 
 #[derive(Clone)]
 pub struct AccountStruct {
@@ -78,14 +78,13 @@ impl AccountStruct {
     }
 }
 pub fn check_account() {
-    unsafe {
-        let name = CURRENT_ACCOUNT.get_name();
-        let uuid = CURRENT_ACCOUNT.get_uuid();
-        if name.is_empty() || uuid.is_empty() {
-            println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任意账号噢！请选择一个再试试吧！"))
-        }
-        println!("您当前选择的账号名称是：\n{}\n账号UUID是：\n{}", name, uuid);
+    let acc = CURRENT_ACCOUNT.with_borrow(|e| e.clone());
+    let name = acc.get_name();
+    let uuid = acc.get_uuid();
+    if name.is_empty() || uuid.is_empty() {
+        println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任意账号噢！请选择一个再试试吧！"))
     }
+    println!("您当前选择的账号名称是：\n{}\n账号UUID是：\n{}", name, uuid);
 }
 fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
@@ -95,9 +94,9 @@ fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
         let s = login.refresh_microsoft(refresh_token.to_string()).await;
         match s {
             Ok(e) => {
-                unsafe {
-                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 1);
-                }
+                TEMP_ACC.with_borrow_mut(move |o| {
+                    o.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 1);
+                });
             },
             Err(e) => {
                 match e {
@@ -153,13 +152,12 @@ fn sr_microsoft(client_id: &str, refresh_token: &str) -> AccountStruct {
             }
         }
     });
-    unsafe {
-        return TEMP_ACC.clone();
-    }
+    let temp = TEMP_ACC.with_borrow(|e| e.clone());
+    temp.clone()
 }
 pub fn remove_account() {
-    unsafe {
-        let acc_obj = ACCOUNT_JSON["account"].as_array_mut().expect("JSON Parse Error!");
+    ACCOUNT_JSON.with_borrow_mut(|acc| {
+        let acc_obj = acc["account"].as_array_mut().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..acc_obj.len() {
             let j = acc_obj[i].clone();
@@ -190,23 +188,28 @@ pub fn remove_account() {
             println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
             return;
         }
+        let cacc = CHOOSE_ACCOUNT.with_borrow(|e| e.clone());
         let input_num = input_num - 1;
-        if CHOOSE_ACCOUNT > input_num as i32 {
-            CHOOSE_ACCOUNT -= 1;
-        } else if CHOOSE_ACCOUNT == input_num as i32 {
-            CHOOSE_ACCOUNT = -1;
-            CURRENT_ACCOUNT.set_account("", "", "", "", "", "", "", 0);
+        if cacc > input_num as i32 {
+            CHOOSE_ACCOUNT.set(cacc - 1);
+        } else if cacc == input_num as i32 {
+            CHOOSE_ACCOUNT.set(-1);
+            CURRENT_ACCOUNT.with_borrow_mut(|acc| {
+                acc.set_account("", "", "", "", "", "", "", 0);
+            });
         }
-        crate::main_method::OTHER_INI.write_str("Account", "SelectAccount", CHOOSE_ACCOUNT.to_string().as_str());
+        let oini = crate::main_method::OTHER_INI.with_borrow(|e| e.clone());
+        oini.write_str("Account", "SelectAccount", input_num.to_string().as_str());
         acc_obj.remove(input_num);
-    }
-    save_account();
-    println!("{}", ansi_term::Color::Green.paint("移除成功！"));
+        save_account();
+        println!("{}", ansi_term::Color::Green.paint("移除成功！"));
+    });
 }
 pub fn set_microsoft(client_id: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async move {
+        use clipboard::ClipboardProvider;
         let login = crate::rust_lib::account_mod::AccountLogin::new_ms(client_id);
         let (user_code, device_code) = login.get_user_code().await.unwrap();
         println!("请复制你的用户代码，并将其粘贴到浏览器上：{}", user_code);
@@ -214,13 +217,13 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
         cb.set_contents(user_code.to_owned()).unwrap();
         std::process::Command::new("explorer.exe").arg("https://www.microsoft.com/link").spawn().expect("Some Error appear!");
         loop {
-            std::thread::sleep(std::time::Duration::from_secs(5));
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             let s = login.login_microsoft(device_code.clone()).await;
             match s {
                 Ok(e) => {
-                    unsafe {
-                        TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 1);
-                    }
+                    TEMP_ACC.with_borrow_mut(move |o| {
+                        o.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), e.get_refresh_token().as_str(), "", "", "", 1);
+                    });
                     break;
                 },
                 Err(e) => {
@@ -280,9 +283,8 @@ pub fn set_microsoft(client_id: &str) -> AccountStruct {
             }
         }
     });
-    unsafe {
-        return TEMP_ACC.clone();
-    }
+    let temp = TEMP_ACC.with_borrow(|e| e.clone());
+    temp.clone()
 }
 fn sr_thirdparty(server: &str, access_token: &str, client_token: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
@@ -292,9 +294,9 @@ fn sr_thirdparty(server: &str, access_token: &str, client_token: &str) -> Accoun
         let s = login.refresh_thirdparty(access_token.to_string(), client_token.to_string()).await;
         match s {
             Ok(e) => {
-                unsafe {
-                    TEMP_ACC.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), "", e.get_client_token().as_str(), server, e.get_base().as_str(), 2);
-                }
+                TEMP_ACC.with_borrow_mut(|o| {
+                    o.set_account(e.get_name().as_str(), e.get_uuid().as_str(), e.get_access_token().as_str(), "", e.get_client_token().as_str(), server, e.get_base().as_str(), 2);
+                });
             },
             Err(e) => {
                 match e {
@@ -314,9 +316,8 @@ fn sr_thirdparty(server: &str, access_token: &str, client_token: &str) -> Accoun
             }
         }
     });
-    unsafe {
-        return TEMP_ACC.clone();
-    }
+    let temp = TEMP_ACC.with_borrow(|e| e.clone());
+    temp.clone()
 }
 pub fn set_thirdparty(server: &str, username: &str, password: &str, client_token: &str) -> AccountStruct {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -353,9 +354,9 @@ pub fn set_thirdparty(server: &str, username: &str, password: &str, client_token
                 }
                 let input_num = input_num - 1;
                 let res_acc = e[input_num].clone();
-                unsafe {
-                    TEMP_ACC.set_account(res_acc.get_name().as_str(), res_acc.get_uuid().as_str(), res_acc.get_access_token().as_str(), "", res_acc.get_client_token().as_str(), server, res_acc.get_base().as_str(), 2)
-                }
+                TEMP_ACC.with_borrow_mut(|o| {
+                    o.set_account(res_acc.get_name().as_str(), res_acc.get_uuid().as_str(), res_acc.get_access_token().as_str(), "", res_acc.get_client_token().as_str(), server, res_acc.get_base().as_str(), 2)
+                });
             },
             Err(e) => {
                 match e {
@@ -375,15 +376,14 @@ pub fn set_thirdparty(server: &str, username: &str, password: &str, client_token
             }
         }
     });
-    unsafe {
-        return TEMP_ACC.clone();
-    }
+    let temp = TEMP_ACC.with_borrow(|e| e.clone());
+    temp.clone()
 }
 pub fn add_microsoft() {
     //使用tokio执行异步程序，但是阻塞了主线程。
     let acc = set_microsoft(crate::privacy::MS_CLIENT_ID);
-    unsafe {
-        let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
+    ACCOUNT_JSON.with_borrow_mut(|acc_obj| {
+        let acc_obj = acc_obj.get_mut("account").expect("JSON Parse Error!");
         let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
         let mut push_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
         let push_obj = push_obj.as_object_mut().unwrap();
@@ -393,13 +393,13 @@ pub fn add_microsoft() {
         push_obj.insert(String::from("access_token"), serde_json::Value::String(acc.get_access_token().clone()));
         push_obj.insert(String::from("refresh_token"), serde_json::Value::String(acc.get_refresh_token().clone()));
         acc_obj.push(serde_json::Value::Object(push_obj.clone()));
-    }
+    });
     save_account();
     println!("{}", ansi_term::Color::Green.paint("添加成功！"));
 }
 pub fn refresh_account() {
-    unsafe {
-        let acc_obj = ACCOUNT_JSON["account"].as_array().expect("JSON Parse Error!");
+    ACCOUNT_JSON.with_borrow_mut(|acc| {
+        let acc_obj = acc["account"].as_array_mut().expect("JSON Parse Error!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..acc_obj.len() {
             let j = acc_obj[i].clone();
@@ -439,8 +439,6 @@ pub fn refresh_account() {
         }else if tp.eq("microsoft") {
             let re = acc.get("refresh_token").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
             let rj = sr_microsoft(crate::privacy::MS_CLIENT_ID, re);
-            let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
-            let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
             let acc_obj = acc_obj.get_mut(input_num).expect("JSON Parse Error!").as_object_mut().expect("JSON Parse Error!");
             acc_obj.remove("name");
             acc_obj.remove("uuid");
@@ -455,15 +453,13 @@ pub fn refresh_account() {
             let re = acc.get("access_token").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
             let rc = acc.get("client_token").expect("JSON Parse Error!").as_str().expect("JSON Parse Error!");
             let rj = sr_thirdparty(rs, re, rc);
-            let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
-            let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
             let acc_obj = acc_obj.get_mut(input_num).expect("JSON Parse Error!").as_object_mut().expect("JSON Parse Error!");
             acc_obj.remove("access_token");
             acc_obj.insert(String::from("access_token"), serde_json::Value::String(rj.get_access_token()));
         }else{
             panic!("Cannot solve AccountJSON type value!")
         }
-    }
+    });
     save_account();
     println!("{}", ansi_term::Color::Green.paint("刷新成功！"));
 }
@@ -501,8 +497,8 @@ pub fn add_thirdparty() {
         clt = input_clt.clone();
     }
     let acc = set_thirdparty(input_ser.as_str(), input_acc.as_str(), input_pas.as_str(), clt.as_str());
-    unsafe {
-        let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
+    ACCOUNT_JSON.with_borrow_mut(|acc_mut| {
+        let acc_obj = acc_mut.get_mut("account").expect("JSON Parse Error!");
         let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
         let mut push_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
         let push_obj = push_obj.as_object_mut().unwrap();
@@ -514,56 +510,57 @@ pub fn add_thirdparty() {
         push_obj.insert(String::from("client_token"), serde_json::Value::String(acc.get_client_token().clone()));
         push_obj.insert(String::from("base_code"), serde_json::Value::String(acc.get_base().clone()));
         acc_obj.push(serde_json::Value::Object(push_obj.clone()));
-    }
+    });
     save_account();
     println!("{}", ansi_term::Color::Green.paint("添加成功！"));
 }
 pub fn choose_account() {
-    unsafe {
-        let acc_obj = ACCOUNT_JSON["account"].as_array().expect("JSON Parse Error!");
-        let mut res: Vec<String> = Vec::new();
-        for i in 0..acc_obj.len() {
-            let j = acc_obj[i].clone();
-            let n = j["name"].as_str().expect("JSON Parse Error!");
-            let o = j["type"].as_str().expect("JSON Parse Error!");
-            let o = if o.eq("offline") { "（离线）" } else if o.eq("microsoft") { "（微软）" } else if o.eq("thirdparty") { "（外置）" } else { panic!("Cannot solve AccountJSON type value!") };
-            res.push(format!("{}. {} {}", i + 1, o, n));
-        }
-        if res.len() == 0 {
-            println!("{}", ansi_term::Color::Yellow.paint("你还没有添加任何一个账号噢！请去添加一个再来！"));
-            return;
-        }
-        println!("----------------------------------------------");
-        println!("请输入你要选择的账号：");
-        for i in res.iter() {
-            println!("{}", i);
-        }
-        println!("----------------------------------------------");
-        let mut input_num = String::new();
-        std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
-        let input_num = input_num.trim().parse::<usize>();
-        if let Err(_) = input_num {
-            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
-            return;
-        }
-        let input_num = input_num.unwrap();
-        if input_num > res.len() || input_num < 1 {
-            println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
-            return;
-        }
-        let input_num = input_num - 1;
-        crate::main_method::OTHER_INI.write_str("Account", "SelectAccount", input_num.to_string().as_str());
-        CHOOSE_ACCOUNT = input_num as i32;
-        let o = acc_obj[input_num].as_object().unwrap();
-        let t = o["type"].as_str().unwrap();
+    let acc = ACCOUNT_JSON.with_borrow(|e| e.clone());
+    let acc_obj = acc["account"].as_array().expect("JSON Parse Error!");
+    let mut res: Vec<String> = Vec::new();
+    for i in 0..acc_obj.len() {
+        let j = acc_obj[i].clone();
+        let n = j["name"].as_str().expect("JSON Parse Error!");
+        let o = j["type"].as_str().expect("JSON Parse Error!");
+        let o = if o.eq("offline") { "（离线）" } else if o.eq("microsoft") { "（微软）" } else if o.eq("thirdparty") { "（外置）" } else { panic!("Cannot solve AccountJSON type value!") };
+        res.push(format!("{}. {} {}", i + 1, o, n));
+    }
+    if res.len() == 0 {
+        println!("{}", ansi_term::Color::Yellow.paint("你还没有添加任何一个账号噢！请去添加一个再来！"));
+        return;
+    }
+    println!("----------------------------------------------");
+    println!("请输入你要选择的账号：");
+    for i in res.iter() {
+        println!("{}", i);
+    }
+    println!("----------------------------------------------");
+    let mut input_num = String::new();
+    std::io::stdin().read_line(&mut input_num).expect("Cannot read num!");
+    let input_num = input_num.trim().parse::<usize>();
+    if let Err(_) = input_num {
+        println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+        return;
+    }
+    let input_num = input_num.unwrap();
+    if input_num > res.len() || input_num < 1 {
+        println!("{}", ansi_term::Color::Red.paint("输入了错误的数字，请重新输入！"));
+        return;
+    }
+    let input_num = input_num - 1;
+    crate::main_method::OTHER_INI.with_borrow(|e| e.clone()).write_str("Account", "SelectAccount", input_num.to_string().as_str());
+    CHOOSE_ACCOUNT.set(input_num as i32);
+    let o = acc_obj[input_num].as_object().unwrap();
+    let t = o["type"].as_str().unwrap();
+    CURRENT_ACCOUNT.with_borrow_mut(|cacc| {
         if t.eq("offline") {
-            CURRENT_ACCOUNT.set_account(o["name"]
+            cacc.set_account(o["name"]
                 .as_str()
                 .expect("Parse JSON Error!"), o["uuid"]
                 .as_str()
                 .expect("Parse JSON Error!"), "", "", "", "", "", 0);
         } else if t.eq("microsoft") {
-            CURRENT_ACCOUNT.set_account(o["name"]
+            cacc.set_account(o["name"]
                 .as_str()
                 .expect("Parse JSON Error!"), o["uuid"]
                 .as_str()
@@ -571,7 +568,7 @@ pub fn choose_account() {
                 .as_str()
                 .expect("Parse JSON Error!"), "", "", "", "", 1);
         } else if t.eq("thirdparty") {
-            CURRENT_ACCOUNT.set_account(o["name"]
+            cacc.set_account(o["name"]
                 .as_str()
                 .expect("Parse JSON Error!"), o["uuid"]
                 .as_str()
@@ -587,7 +584,7 @@ pub fn choose_account() {
         } else {
             panic!("Cannot solve AccountJSON type value!")
         }
-    }
+    });
     println!("{}", ansi_term::Color::Green.paint("选择成功！"));
 }
 pub fn add_offline() {
@@ -612,8 +609,8 @@ pub fn add_offline() {
         println!("{}", ansi_term::Color::Red.paint("离线模式UUID输入不规范，请重新输入！"));
         return;
     }
-    unsafe {
-        let acc_obj = ACCOUNT_JSON.get_mut("account").expect("JSON Parse Error!");
+    ACCOUNT_JSON.with_borrow_mut(|acc_mut| {
+        let acc_obj = acc_mut.get_mut("account").expect("JSON Parse Error!");
         let acc_obj = acc_obj.as_array_mut().expect("JSON Parse Error!");
         let mut push_obj = serde_json::from_str::<serde_json::Value>("{}").unwrap();
         let push_obj = push_obj.as_object_mut().unwrap();
@@ -621,7 +618,7 @@ pub fn add_offline() {
         push_obj.insert(String::from("name"), serde_json::Value::String(input_name.clone()));
         push_obj.insert(String::from("uuid"), serde_json::Value::String(input_uuid.clone()));
         acc_obj.push(serde_json::Value::Object(push_obj.clone()));
-    }
+    });
     save_account();
     println!("{}", ansi_term::Color::Green.paint("添加成功！"));
 }
@@ -644,9 +641,8 @@ pub fn get_legal_uuid() {
     }
 }
 pub fn save_account() {
-    unsafe {
-        crate::rust_lib::main_mod::set_file(
-            format!("{}\\TankLauncherModule\\AccountJSON.json", crate::main_method::APP_DATA).as_str(), 
-            serde_json::to_string_pretty(&ACCOUNT_JSON.clone()).unwrap());
-    }
+    let acc = ACCOUNT_JSON.with_borrow(|e| e.clone());
+    crate::rust_lib::main_mod::set_file(
+        format!("{}\\TankLauncherModule\\AccountJSON.json", crate::main_method::APP_DATA.with_borrow(|e| e.clone())).as_str(), 
+        serde_json::to_string_pretty(&acc.clone()).unwrap());
 }

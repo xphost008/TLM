@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct IniFile {
     path: String,
 }
@@ -38,7 +39,7 @@ impl IniFile {
             default
         }
     }
-    pub fn read_str<'a>(&'a self, section: &str, key: &str, default: &'a str) -> String {
+    pub fn read_str(&self, section: &str, key: &str, default: &str) -> String {
         let re = ini::Ini::load_from_file(self.path.as_str());
         if let Err(_) = re {
             return default.to_string();
@@ -50,7 +51,7 @@ impl IniFile {
         }
         let key = section.unwrap().get(key);
         return if let Some(t) = key {
-            t.to_owned()
+            t.to_string()
         } else {
             default.to_string()
         }

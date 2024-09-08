@@ -1,25 +1,24 @@
 pub fn is_isolation(root_path: String, sel_path: String) -> String {
-    unsafe {
-        let real_path = crate::rust_lib::launcher_mod::get_mc_real_path(sel_path.clone(), ".json").expect("Cannot read version json!").to_lowercase();
-        let sel_cont = crate::rust_lib::main_mod::get_file(real_path.as_str()).expect("Read version file content error!");
-        let pd = (sel_cont.contains("neoforge")) || (sel_cont.contains("forge")) || sel_cont.contains("quilt") || sel_cont.contains("fabric");
-        return if crate::version::IS_ISOLATION == 4 {
+    let real_path = crate::rust_lib::launcher_mod::get_mc_real_path(sel_path.clone(), ".json").expect("Cannot read version json!");
+    let sel_cont = crate::rust_lib::main_mod::get_file(real_path.as_str()).expect("Read version file content error!").to_lowercase();
+    let pd = (sel_cont.contains("neoforge")) || (sel_cont.contains("forge")) || sel_cont.contains("quilt") || sel_cont.contains("fabric");
+    let iso = crate::version::IS_ISOLATION.with_borrow(|e| e.clone());
+    return if iso == 4 {
+        sel_path.clone()
+    }else if iso == 3 {
+        if pd {
             sel_path.clone()
-        }else if crate::version::IS_ISOLATION == 3 {
-            if pd {
-                sel_path.clone()
-            }else{
-                root_path.clone()
-            }
-        }else if crate::version::IS_ISOLATION == 2 {
-            if pd {
-                sel_path.clone()
-            }else{
-                root_path.clone()
-            }
-        }else {
+        }else{
             root_path.clone()
         }
+    }else if iso == 2 {
+        if pd {
+            sel_path.clone()
+        }else{
+            root_path.clone()
+        }
+    }else {
+        root_path.clone()
     }
 }
 
@@ -27,30 +26,29 @@ pub fn start_launch(option: crate::rust_lib::launcher_mod::LaunchOption){
     let catch = std::panic::catch_unwind(move || {
         let option = option.clone();
         let launch = crate::rust_lib::launcher_mod::launch_game(option.clone(), move |command| {
-            unsafe {
-                let output_file_path = format!("{}\\TankLauncherModule\\run.bat", crate::main_method::APP_DATA);
-                let game_path = option.get_game_path();
-                let cmd_str = command.iter().map(|e| format!("\"{}\"", e.to_string())).collect::<Vec<String>>().join(" ");
-                if crate::rust_lib::main_mod::set_file(output_file_path.as_str(), cmd_str.clone()) {
-                    println!("参数拼接成功！正在为您启动游戏！");
-                    let cmd = std::process::Command::new("cmd")
-                        .arg("/c")
-                        .arg(output_file_path.as_str())
-                        .current_dir(game_path)
-                        .spawn();
-                    if let Ok(mut o) = cmd {
-                        if let Ok(e) = o.wait() {
-                            if let Some(f) = e.code() {
-                                println!("程序已退出，退出代码为：{}", f);
-                                if !crate::rust_lib::main_mod::delete_file(output_file_path.as_str()) {
-                                    println!("{}", ansi_term::Color::Yellow.paint("文件删除失败！"));
-                                }
+            let binding = crate::main_method::APP_DATA.with_borrow(|e| e.clone());
+            let output_file_path = format!("{}\\TankLauncherModule\\run.bat", binding.clone());
+            let game_path = option.get_game_path();
+            let cmd_str = command.iter().map(|e| format!("\"{}\"", e.to_string())).collect::<Vec<String>>().join(" ");
+            if crate::rust_lib::main_mod::set_file(output_file_path.as_str(), cmd_str.clone()) {
+                println!("参数拼接成功！正在为您启动游戏！");
+                let cmd = std::process::Command::new("cmd")
+                    .arg("/c")
+                    .arg(output_file_path.as_str())
+                    .current_dir(game_path)
+                    .spawn();
+                if let Ok(mut o) = cmd {
+                    if let Ok(e) = o.wait() {
+                        if let Some(f) = e.code() {
+                            println!("程序已退出，退出代码为：{}", f);
+                            if !crate::rust_lib::main_mod::delete_file(output_file_path.as_str()) {
+                                println!("{}", ansi_term::Color::Yellow.paint("文件删除失败！"));
                             }
                         }
                     }
-                }else{
-                    println!("{}", ansi_term::Color::Red.paint("启动失败，文件输出失败！"));
                 }
+            }else{
+                println!("{}", ansi_term::Color::Red.paint("启动失败，文件输出失败！"));
             }
         });
         if let Err(e) = launch {

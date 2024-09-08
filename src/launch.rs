@@ -1,19 +1,21 @@
-pub static mut WINDOW_HEIGHT: usize = 480;
-pub static mut WINDOW_WIDTH: usize = 854;
-pub static mut MAX_MEMORY: usize = 4096;
-pub static mut MIN_MEMORY: usize = 1024;
-pub static mut ADDITIONAL_JVM: String = String::new();
-pub static mut ADDITIONAL_GAME: String = String::new();
-pub static mut CUSTOM_INFO: String = String::new();
-pub static mut JAVA_JSON: serde_json::Value = serde_json::Value::Null;
-pub static mut CHOOSE_JAVA: i32 = -1;
-pub static mut CURRENT_JAVA: String = String::new();
-pub static mut CURRENT_BITS: String = String::new();
-pub static mut CURRENT_VERSION: String = String::new();
+thread_local! {
+    pub static WINDOW_HEIGHT: std::cell::RefCell<usize> = std::cell::RefCell::new(480);
+    pub static WINDOW_WIDTH: std::cell::RefCell<usize> = std::cell::RefCell::new(854);
+    pub static MAX_MEMORY: std::cell::RefCell<usize> = std::cell::RefCell::new(4096);
+    pub static MIN_MEMORY: std::cell::RefCell<usize> = std::cell::RefCell::new(256);
+    pub static ADDITIONAL_JVM: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static ADDITIONAL_GAME: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static CUSTOM_INFO: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static JAVA_JSON: std::cell::RefCell<serde_json::Value> = std::cell::RefCell::new(serde_json::Value::Null);
+    pub static CHOOSE_JAVA: std::cell::RefCell<i32> = std::cell::RefCell::new(-1);
+    pub static CURRENT_JAVA: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static CURRENT_BITS: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+    pub static CURRENT_VERSION: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
+}
 
 fn add_java_simple(path: String) -> bool {
-    unsafe {
-        let java_obj = JAVA_JSON["java"].as_array_mut().expect("Cannot Parse Java JSON");
+    let a = JAVA_JSON.with_borrow_mut(|java_obj| {
+        let java_obj = java_obj["java"].as_array_mut().expect("Cannot Parse Java JSON");
         for i in java_obj.iter() {
             let j = i["path"].as_str().expect("Cannot Parse Java JSON");
             if j.eq(path.as_str()) {
@@ -38,8 +40,9 @@ fn add_java_simple(path: String) -> bool {
         push_obj.insert(String::from("bits"), serde_json::Value::String(bits.to_string()));
         push_obj.insert(String::from("version"), serde_json::Value::String(version.clone()));
         java_obj.push(serde_json::Value::Object(push_obj.clone()));
-    }
-    return true;
+        true
+    });
+    a
 }
 
 fn recursion_search_java(path: String) -> bool {
@@ -67,7 +70,7 @@ fn recursion_search_java(path: String) -> bool {
             }
         }
     }
-    return true;
+    true
 }
 
 fn full_scan_java() {
@@ -118,59 +121,58 @@ fn java_search_regedit() -> bool {
             }
         }
     }
-    return true;
+    true
 }
 
 fn simple_scan_java() {
-    unsafe {
-        let appdata_path = std::path::Path::new(crate::main_method::APP_DATA.as_str());
-        let appdata_path = appdata_path.parent().expect("Cannot get appdata parent path!");
-        let appdata_path = appdata_path.join("Local");
-        if !appdata_path.exists() || appdata_path.exists() && appdata_path.is_file() {
-            panic!("Cannot get appdata Local Path!");
-        }
-        if !java_search_regedit() {
-            println!("{}", ansi_term::Color::Red.paint("搜索注册表时发生了错误，你可能没有以管理员启动该程序！"));
-        }
-        let ev = std::env::var("PATH");
-        if let Ok(e) = ev {
-            let v = e.split(";").collect::<Vec<&str>>();
-            for i in v.into_iter() {
-                if i.to_lowercase().contains("c:\\windows") || i.to_lowercase().contains("recycle.bin") { continue; }
-                let p = std::path::Path::new(i);
-                if p.exists() && p.is_dir(){
-                    if !recursion_search_java(i.to_string()) {
-                        println!("{}", ansi_term::Color::Red.paint("搜索环境变量PATH时发生了错误，你可能没有以管理员启动该程序！"));
-                    }
+    let binding = crate::main_method::APP_DATA.with_borrow(|e| e.clone());
+    let appdata_path = std::path::Path::new(binding.as_str());
+    let appdata_path = appdata_path.parent().expect("Cannot get appdata parent path!");
+    let appdata_path = appdata_path.join("Local");
+    if !appdata_path.exists() || appdata_path.exists() && appdata_path.is_file() {
+        panic!("Cannot get appdata Local Path!");
+    }
+    if !java_search_regedit() {
+        println!("{}", ansi_term::Color::Red.paint("搜索注册表时发生了错误，你可能没有以管理员启动该程序！"));
+    }
+    let ev = std::env::var("PATH");
+    if let Ok(e) = ev {
+        let v = e.split(";").collect::<Vec<&str>>();
+        for i in v.into_iter() {
+            if i.to_lowercase().contains("c:\\windows") || i.to_lowercase().contains("recycle.bin") { continue; }
+            let p = std::path::Path::new(i);
+            if p.exists() && p.is_dir(){
+                if !recursion_search_java(i.to_string()) {
+                    println!("{}", ansi_term::Color::Red.paint("搜索环境变量PATH时发生了错误，你可能没有以管理员启动该程序！"));
                 }
             }
-        }else{
-            println!("{}", ansi_term::Color::Red.paint("搜索环境变量时发生了错误，你可能没有以管理员启动该程序！"));
         }
-        let c64 = std::path::Path::new("C:\\Program File\\Java");
-        if c64.exists() && c64.is_dir() {
-            if !recursion_search_java(c64.to_str().unwrap().to_string()){
-                println!("{}", ansi_term::Color::Red.paint("搜索C:\\Program File\\Java时发生了错误！"));
-            }
+    }else{
+        println!("{}", ansi_term::Color::Red.paint("搜索环境变量时发生了错误，你可能没有以管理员启动该程序！"));
+    }
+    let c64 = std::path::Path::new("C:\\Program File\\Java");
+    if c64.exists() && c64.is_dir() {
+        if !recursion_search_java(c64.to_str().unwrap().to_string()){
+            println!("{}", ansi_term::Color::Red.paint("搜索C:\\Program File\\Java时发生了错误！"));
         }
-        let c32 = std::path::Path::new("C:\\Program Files (x86)\\Java");
-        if c32.exists() && c32.is_dir() {
-            if !recursion_search_java(c32.to_str().unwrap().to_string()){
-                println!("{}", ansi_term::Color::Red.paint("搜索C:\\Program Files (x86)\\Java时发生了错误！"));
-            }
+    }
+    let c32 = std::path::Path::new("C:\\Program Files (x86)\\Java");
+    if c32.exists() && c32.is_dir() {
+        if !recursion_search_java(c32.to_str().unwrap().to_string()){
+            println!("{}", ansi_term::Color::Red.paint("搜索C:\\Program Files (x86)\\Java时发生了错误！"));
         }
-        let g = appdata_path.join("Packages").join("Microsoft.4297127D64EC6_8wekyb3d8bbwe").join("LocalCache").join("Local").join("runtime");
-        if g.exists() && g.is_dir() {
-            if !recursion_search_java(g.to_str().unwrap().to_string()){
-                println!("{}", ansi_term::Color::Red.paint("搜索官方启动器目录时发生了错误！"));
-            }
+    }
+    let g = appdata_path.join("Packages").join("Microsoft.4297127D64EC6_8wekyb3d8bbwe").join("LocalCache").join("Local").join("runtime");
+    if g.exists() && g.is_dir() {
+        if !recursion_search_java(g.to_str().unwrap().to_string()){
+            println!("{}", ansi_term::Color::Red.paint("搜索官方启动器目录时发生了错误！"));
         }
-        let at = format!("{}\\TankLauncherModule\\Java", crate::main_method::APP_DATA.clone());
-        let t = std::path::Path::new(at.as_str());
-        if t.exists() && t.is_dir() {
-            if !recursion_search_java(t.to_str().unwrap().to_string()){
-                println!("{}", ansi_term::Color::Red.paint("搜索官方启动器目录时发生了错误！"));
-            }
+    }
+    let at = format!("{}\\TankLauncherModule\\Java", binding.clone());
+    let t = std::path::Path::new(at.as_str());
+    if t.exists() && t.is_dir() {
+        if !recursion_search_java(t.to_str().unwrap().to_string()){
+            println!("{}", ansi_term::Color::Red.paint("搜索官方启动器目录时发生了错误！"));
         }
     }
 }
@@ -198,26 +200,24 @@ pub fn do_scan_java() {
 }
 
 pub fn check_launch(){
-    unsafe {
-        println!("当前全局设置为：");
-        if CHOOSE_JAVA < 0 {
-            println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任一Java！"));
-        } else {
-            let path = CURRENT_JAVA.clone();
-            let bits = CURRENT_BITS.clone();
-            let version = CURRENT_VERSION.clone();
-            println!("\n你目前选择的Java是：\n(Java {} x{}) {}\n", version, bits, path);
-        }
-        println!("当前设置的窗口宽度为：{}", WINDOW_WIDTH);
-        println!("当前设置的窗口高度为：{}", WINDOW_HEIGHT);
-        println!("当前设置的最小内存为：{}", MIN_MEMORY);
-        println!("当前设置的最大内存为：{}", MAX_MEMORY);
+    println!("当前全局设置为：");
+    if CHOOSE_JAVA.with_borrow(|e| e.clone()) < 0 {
+        println!("{}", ansi_term::Color::Yellow.paint("你还暂未选择任一Java！"));
+    } else {
+        let path = CURRENT_JAVA.with_borrow(|e| e.clone());
+        let bits = CURRENT_BITS.with_borrow(|e| e.clone());
+        let version = CURRENT_VERSION.with_borrow(|e| e.clone());
+        println!("\n你目前选择的Java是：\n(Java {} x{}) {}\n", version, bits, path);
     }
+    println!("当前设置的窗口宽度为：{}", WINDOW_WIDTH.with_borrow(|e| e.clone()));
+    println!("当前设置的窗口高度为：{}", WINDOW_HEIGHT.with_borrow(|e| e.clone()));
+    println!("当前设置的最小内存为：{}", MIN_MEMORY.with_borrow(|e| e.clone()));
+    println!("当前设置的最大内存为：{}", MAX_MEMORY.with_borrow(|e| e.clone()));
 }
 
 pub fn choose_java() {
-    unsafe {
-        let java_obj = JAVA_JSON["java"].as_array().expect("Cannot read java json!");
+    JAVA_JSON.with_borrow_mut(|java_obj| {
+        let java_obj = java_obj["java"].as_array().expect("Cannot read java json!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..java_obj.len() {
             let j = java_obj[i].as_object().expect("Cannot read java json!");
@@ -249,19 +249,19 @@ pub fn choose_java() {
             return;
         }
         let input_num = input_num - 1;
-        CHOOSE_JAVA = input_num as i32;
-        crate::main_method::TLM_INI.write_str("Java", "SelectJava", CHOOSE_JAVA.to_string().as_str());
+        CHOOSE_JAVA.set(input_num as i32);
+        crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Java", "SelectJava", input_num.to_string().as_str()));
         let current = java_obj[input_num].as_object().unwrap();
-        CURRENT_JAVA = current["path"].as_str().unwrap().to_string();
-        CURRENT_BITS = current["bits"].as_str().unwrap().to_string();
-        CURRENT_VERSION = current["version"].as_str().unwrap().to_string();
-    }
+        CURRENT_JAVA.set(current["path"].as_str().unwrap().to_string());
+        CURRENT_BITS.set(current["bits"].as_str().unwrap().to_string());
+        CURRENT_VERSION.set(current["version"].as_str().unwrap().to_string());
+    });
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
 pub fn remove_java() {
-    unsafe {
-        let java_obj = JAVA_JSON["java"].as_array_mut().expect("Cannot read java json!");
+    JAVA_JSON.with_borrow_mut(|java_obj| {
+        let java_obj = java_obj["java"].as_array_mut().expect("Cannot read java json!");
         let mut res: Vec<String> = Vec::new();
         for i in 0..java_obj.len() {
             let j = java_obj[i].as_object().expect("Cannot read java json!");
@@ -293,17 +293,18 @@ pub fn remove_java() {
             return;
         }
         let input_num = input_num - 1;
-        if CHOOSE_JAVA > input_num as i32 {
-            CHOOSE_JAVA -= 1;
-        } else if CHOOSE_JAVA == input_num as i32 {
-            CHOOSE_JAVA = -1;
-            CURRENT_JAVA = String::new();
-            CURRENT_BITS = String::new();
-            CURRENT_VERSION = String::new();
+        let cj = CHOOSE_JAVA.with_borrow(|e| e.clone());
+        if cj > input_num as i32 {
+            CHOOSE_JAVA.set(cj - 1);
+        } else if cj == input_num as i32 {
+            CHOOSE_JAVA.set(-1);
+            CURRENT_JAVA.set(String::new());
+            CURRENT_BITS.set(String::new());
+            CURRENT_VERSION.set(String::new());
         }
-        crate::main_method::TLM_INI.write_str("Java", "SelectJava", CHOOSE_JAVA.to_string().as_str());
+        crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Java", "SelectJava", CHOOSE_JAVA.with_borrow(|e| e.clone()).to_string().as_str()));
         java_obj.remove(input_num);
-    }
+    });
     save_launch();
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
@@ -334,10 +335,8 @@ pub fn set_additional_jvm() {
     println!("请输入你要设置的额外JVM参数");
     std::io::stdin().read_line(&mut input_str).expect("Cannot read number!");
     let input_str = input_str.trim().to_string();
-    unsafe {
-        ADDITIONAL_JVM = input_str.clone();
-        crate::main_method::TLM_INI.write_str("Version", "AdditionalJVM", ADDITIONAL_JVM.as_str());
-    }
+    ADDITIONAL_JVM.set(input_str.clone());
+    crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Version", "AdditionalJVM", input_str.as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -346,10 +345,8 @@ pub fn set_additional_game() {
     println!("请输入你要设置的额外Game参数");
     std::io::stdin().read_line(&mut input_str).expect("Cannot read number!");
     let input_str = input_str.trim().to_string();
-    unsafe {
-        ADDITIONAL_GAME = input_str.clone();
-        crate::main_method::TLM_INI.write_str("Version", "AdditionalGame", ADDITIONAL_GAME.as_str());
-    }
+    ADDITIONAL_GAME.set(input_str.clone());
+    crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Version", "AdditionalGame", input_str.as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -358,10 +355,12 @@ pub fn set_custom_info() {
     println!("请输入你要设置的自定义信息（将会显示在进入游戏的左下角以及进入地图后按F3的左上角。）");
     std::io::stdin().read_line(&mut input_str).expect("Cannot read number!");
     let input_str = input_str.trim().to_string();
-    unsafe {
-        CUSTOM_INFO = input_str.clone();
-        crate::main_method::TLM_INI.write_str("Version", "CustomInfo", CUSTOM_INFO.as_str());
+    if input_str.is_empty() {
+        println!("{}", ansi_term::Color::Red.paint("请不要输入错误的值！"));
+        return;
     }
+    CUSTOM_INFO.set(input_str.clone());
+    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Version", "CustomInfo", input_str.as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -375,10 +374,8 @@ pub fn set_window_height() {
         return;
     }
     let input_num = input_num.unwrap();
-    unsafe {
-        WINDOW_HEIGHT = input_num;
-        crate::main_method::TLM_INI.write_str("Document", "WindowHeight", WINDOW_HEIGHT.to_string().as_str());
-    }
+    WINDOW_HEIGHT.set(input_num);
+    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "WindowHeight", input_num.to_string().as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -393,10 +390,8 @@ pub fn set_window_width() {
         return;
     }
     let input_num = input_num.unwrap();
-    unsafe {
-        WINDOW_WIDTH = input_num;
-        crate::main_method::TLM_INI.write_str("Document", "WindowHeight", WINDOW_WIDTH.to_string().as_str());
-    }
+    WINDOW_WIDTH.set(input_num);
+    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "WindowHeight", input_num.to_string().as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -410,10 +405,8 @@ pub fn set_max_memory() {
         return;
     }
     let input_num = input_num.unwrap();
-    unsafe {
-        MAX_MEMORY = input_num;
-        crate::main_method::TLM_INI.write_str("Document", "MaxMemory", MAX_MEMORY.to_string().as_str());
-    }
+    MAX_MEMORY.set(input_num);
+    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "MaxMemory", input_num.to_string().as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -427,17 +420,14 @@ pub fn set_min_memory() {
         return;
     }
     let input_num = input_num.unwrap();
-    unsafe {
-        MIN_MEMORY = input_num;
-        crate::main_method::TLM_INI.write_str("Document", "MinMemory", MIN_MEMORY.to_string().as_str());
-    }
+    MIN_MEMORY.set(input_num);
+    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "MinMemory", input_num.to_string().as_str()));
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
 fn save_launch() {
-    unsafe {
-        crate::rust_lib::main_mod::set_file(
-            format!("{}\\TankLauncherModule\\configs\\JavaJSON.json", crate::main_method::CURRENT_DIR).as_str(), 
-            serde_json::to_string_pretty(&JAVA_JSON.clone()).unwrap());
-    }
+    let java_json = JAVA_JSON.with_borrow(|e| e.clone());
+    crate::rust_lib::main_mod::set_file(
+        format!("{}\\TankLauncherModule\\configs\\JavaJSON.json", crate::main_method::CURRENT_DIR.with_borrow(|e| e.clone())).as_str(), 
+        serde_json::to_string_pretty(&java_json.clone()).unwrap());
 }
