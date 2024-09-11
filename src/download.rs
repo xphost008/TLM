@@ -29,6 +29,7 @@ pub fn get_minecraft() {
         let g = crate::rust_lib::download_mod::get_mc_versions().await;
         match g {
             Ok(e) => {
+                crate::rust_lib::some_var::MC_ROOT_JSON.set(e.clone());
                 let e = e["versions"].as_array().expect("Cannot get MC JSON versions!");
                 let mut res: Vec<String> = Vec::new();
                 for i in 0..e.len(){
