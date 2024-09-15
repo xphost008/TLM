@@ -386,6 +386,10 @@ fn launch_game(){
 //     static X: RefCell<String> = RefCell::new(String::from("Test"));
 // }
 fn test(){
+    let a = privacy::gen_machine_code();
+    println!("{}", a);
+    let b = privacy::encrypt(a.as_str(), 5);
+    println!("{}", b);
     // rust_lib::some_var::DOWNLOAD_SOURCE.set(2);
     // let a = rust_lib::download_mod::get_neoforge_version("1.20.1");
     // println!("{}", serde_json::to_string_pretty(&a.unwrap()).unwrap());
@@ -449,7 +453,7 @@ fn test(){
     // }
 }
 fn load_plugin() {
-    let ph = main_method::CURRENT_DIR.with_borrow(|e| e.clone());
+    let ph = main_method::CURRENT_DIR.get().expect("Cannot read Current Dir Value");
     let pp = std::path::Path::new(ph.as_str());
     let pp = pp.join("TankLauncherModule").join("plugins");
     if !pp.exists() || pp.exists() && pp.is_file() {
@@ -694,18 +698,18 @@ fn command_judge_launch(a: Vec<String>, is_panic: bool) {
 }
 fn unsafe_init() {
     let appdata_dir = dirs::data_dir().expect("Cannot get AppData dir!").as_path().display().to_string();
-    main_method::APP_DATA.set(appdata_dir.clone());
+    main_method::APP_DATA.set(appdata_dir.clone()).expect("Cannot set AppData Value");
     let appdata_path = std::path::Path::new(appdata_dir.as_str()).join("TankLauncherModule");
     let other_ini_path = appdata_path.join("Other.ini").to_string_lossy().to_string();
-    main_method::OTHER_INI.with_borrow_mut(|e| e.set_path(other_ini_path.as_str()));
+    main_method::OTHER_INI.set(read_ini::IniFile::new(other_ini_path.as_str())).expect("Cannot set Other ini Value");
     let current_path = std::env::current_exe().expect("Cannot get current exe dir!").parent().expect("Cannot get current exe dir!").to_path_buf();
-    main_method::CURRENT_DIR.set(current_path.to_string_lossy().to_string());
+    main_method::CURRENT_DIR.set(current_path.to_string_lossy().to_string()).expect("Cannot set Current Dir Value");
     let config_path = std::path::Path::new(current_path.as_path()).join("TankLauncherModule").join("configs");
     let tlm_ini_path = config_path.join("TankLauncherModule.ini");
     let tlm_path_str = tlm_ini_path.to_str().expect("Cannot get current exe dir!");
-    let c_other_ini = main_method::OTHER_INI.with_borrow(|e| e.clone());
-    main_method::TLM_INI.with_borrow_mut(|e| e.set_path(tlm_path_str) );
-    let c_tlm_ini = main_method::TLM_INI.with_borrow(|e| e.clone());
+    main_method::TLM_INI.set(read_ini::IniFile::new(tlm_path_str)).expect("Cannot set TLM ini Value");
+    let c_other_ini = main_method::OTHER_INI.get().expect("Cannot read Other ini file");
+    let c_tlm_ini = main_method::TLM_INI.get().expect("Cannot read Other ini file");
     let authlib_path = appdata_path.join("Authlib-Injector.jar");
     if authlib_path.exists() && authlib_path.is_file() {
         rust_lib::some_var::AUTHLIB_PATH.set(authlib_path.to_string_lossy().to_string());

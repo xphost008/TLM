@@ -7,7 +7,7 @@ license = "MIT"
 authors = ["xphost"]
 build = "build.rs"
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
 
 [dependencies]

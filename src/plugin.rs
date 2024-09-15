@@ -11,7 +11,7 @@ pub fn load_lua_plugin(path: &str) -> LuaResult<()>{
     if let Some(e) = c {
         l.load(e.clone()).exec()?;
     }else{
-        println!("Err!")
+        println!("File encoding cannot be recognized, please use GBK or UTF-8!")
     }
     Ok(())
 }

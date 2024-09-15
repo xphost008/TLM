@@ -220,7 +220,7 @@ pub fn set_max_thread() {
         return;
     }
     crate::rust_lib::some_var::BIGGEST_THREAD.set(input_num);
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Version", "ThreadBiggest", input_num.to_string().as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Version", "ThreadBiggest", input_num.to_string().as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -243,6 +243,6 @@ pub fn set_download_source() {
         return;
     }
     crate::rust_lib::some_var::DOWNLOAD_SOURCE.set(input_num);
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Version", "SelectDownloadSource", input_num.to_string().as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Version", "SelectDownloadSource", input_num.to_string().as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }

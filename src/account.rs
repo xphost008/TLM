@@ -194,16 +194,14 @@ pub fn remove_account() {
             CHOOSE_ACCOUNT.set(cacc - 1);
         } else if cacc == input_num as i32 {
             CHOOSE_ACCOUNT.set(-1);
-            CURRENT_ACCOUNT.with_borrow_mut(|acc| {
-                acc.set_account("", "", "", "", "", "", "", 0);
-            });
+            CURRENT_ACCOUNT.set(AccountStruct::new());
         }
-        let oini = crate::main_method::OTHER_INI.with_borrow(|e| e.clone());
-        oini.write_str("Account", "SelectAccount", input_num.to_string().as_str());
+        let caot = CHOOSE_ACCOUNT.with_borrow(|e| e.clone());
+        crate::main_method::OTHER_INI.get().expect("Cannot read Other ini Value").write_str("Account", "SelectAccount", caot.to_string().as_str());
         acc_obj.remove(input_num);
-        save_account();
-        println!("{}", ansi_term::Color::Green.paint("移除成功！"));
     });
+    save_account();
+    println!("{}", ansi_term::Color::Green.paint("移除成功！"));
 }
 pub fn set_microsoft(client_id: &str) -> AccountStruct {
     //使用tokio执行异步程序，但是阻塞了主线程。
@@ -548,7 +546,7 @@ pub fn choose_account() {
         return;
     }
     let input_num = input_num - 1;
-    crate::main_method::OTHER_INI.with_borrow(|e| e.clone()).write_str("Account", "SelectAccount", input_num.to_string().as_str());
+    crate::main_method::OTHER_INI.get().expect("Cannot read Other ini Value").write_str("Account", "SelectAccount", input_num.to_string().as_str());
     CHOOSE_ACCOUNT.set(input_num as i32);
     let o = acc_obj[input_num].as_object().unwrap();
     let t = o["type"].as_str().unwrap();
@@ -643,6 +641,6 @@ pub fn get_legal_uuid() {
 pub fn save_account() {
     let acc = ACCOUNT_JSON.with_borrow(|e| e.clone());
     crate::rust_lib::main_mod::set_file(
-        format!("{}\\TankLauncherModule\\AccountJSON.json", crate::main_method::APP_DATA.with_borrow(|e| e.clone())).as_str(), 
+        format!("{}\\TankLauncherModule\\AccountJSON.json", crate::main_method::APP_DATA.get().expect("Cannot read AppData Value")).as_str(), 
         serde_json::to_string_pretty(&acc.clone()).unwrap());
 }

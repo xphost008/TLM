@@ -29,7 +29,12 @@ pub fn set_isolation() {
         return;
     }
     IS_ISOLATION.set(input_num); 
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Version", "SelectIsolation", IS_ISOLATION.with_borrow(|e| e.clone()).to_string().as_str()));
+    crate::main_method::TLM_INI
+        .get()
+        .expect("Cannot get TLM ini Value")
+        .write_str("Version", "SelectIsolation", IS_ISOLATION.with_borrow(|e| e.clone())
+            .to_string()
+            .as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 pub fn check_version() {
@@ -196,8 +201,18 @@ pub fn remove_root() {
             CURRENT_VERSION_SEL.set(String::new());
             VERSION_SEL_JSON.set(serde_json::from_str::<serde_json::Value>("{\"mcsel\":[]}").unwrap());
         }
-        crate::main_method::TLM_INI.with_borrow(|e| e.write_str("MC", "SelectMC", CHOOSE_VERSION.with_borrow(|e| e.clone()).to_string().as_str()));
-        crate::main_method::TLM_INI.with_borrow(|e| e.write_str("MC", "SelectVer", CHOOSE_VERSION_SEL.with_borrow(|e| e.clone()).to_string().as_str()));
+        crate::main_method::TLM_INI
+            .get()
+            .expect("Cannot read TLM ini Value")
+            .write_str("MC", "SelectMC", CHOOSE_VERSION.with_borrow(|e| e.clone())
+                .to_string()
+                .as_str());
+        crate::main_method::TLM_INI
+            .get()
+            .expect("Cannot read TLM ini Value")
+            .write_str("MC", "SelectVer", CHOOSE_VERSION_SEL.with_borrow(|e| e.clone())
+                .to_string()
+                .as_str());
         ver_obj.remove(input_num);
     });
     reload_version();
@@ -303,7 +318,12 @@ pub fn remove_version() {
             CHOOSE_VERSION_SEL.set(-1);
             CURRENT_VERSION_SEL.set(String::new());
         }
-        crate::main_method::TLM_INI.with_borrow(|e| e.write_str("MC", "SelectVer", CHOOSE_VERSION_SEL.with_borrow(|e| e.clone()).clone().to_string().as_str()));
+        crate::main_method::TLM_INI
+            .get()
+            .expect("Cannot read TLM ini Value")
+            .write_str("MC", "SelectVer", CHOOSE_VERSION_SEL.with_borrow(|e| e.clone())
+                .to_string()
+                .as_str());
     });
     reload_version();
     println!("{}", ansi_term::Color::Green.paint("删除完成！"));
@@ -344,7 +364,9 @@ pub fn choose_version() {
             return;
         }
         let input_num = input_num - 1;
-        crate::main_method::TLM_INI.with_borrow(|e| e.write_str("MC", "SelectVer", input_num.to_string().as_str()));
+        crate::main_method::TLM_INI.get()
+            .expect("Cannot read TLM ini Value")
+            .write_str("MC", "SelectVer", input_num.to_string().as_str());
         CHOOSE_VERSION_SEL.set(input_num as i32);
         CURRENT_VERSION_SEL.set(ver_obj[input_num]["path"].as_str().unwrap().to_string());
     }); 
@@ -387,10 +409,12 @@ pub fn choose_root() {
         CHOOSE_VERSION_SEL.set(-1);
         let act_ver = ver_obj[input_num]["path"].as_str().unwrap().to_string();
         CURRENT_VERSION.set(act_ver.clone());
-        crate::main_method::TLM_INI.with_borrow(|e| {
-            e.write_str("MC", "SelectMC", input_num.to_string().as_str());
-            e.write_str("MC", "SelectVer", "-1");
-        });
+        crate::main_method::TLM_INI.get()
+            .expect("Cannot read TLM ini Value")
+            .write_str("MC", "SelectMC", input_num.to_string().as_str());
+        crate::main_method::TLM_INI.get()
+            .expect("Cannot read TLM ini Value")
+            .write_str("MC", "SelectVer", "-1");
     });
     reload_version();
     save_version();
@@ -426,7 +450,7 @@ pub fn add_directory() {
 pub fn save_version() {
     let version_json = VERSION_JSON.with_borrow(|e| e.clone());
     let version_sel_json = VERSION_SEL_JSON.with_borrow(|e| e.clone());
-    let cdir = crate::main_method::CURRENT_DIR.with_borrow(|e| e.clone());
+    let cdir = crate::main_method::CURRENT_DIR.get().expect("Cannot read Current Dir Value!");
     crate::rust_lib::main_mod::set_file(
         format!("{}\\TankLauncherModule\\configs\\MCJSON.json", cdir.clone()).as_str(), 
         serde_json::to_string_pretty(&version_json.clone()).unwrap());

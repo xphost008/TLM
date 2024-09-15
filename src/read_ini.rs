@@ -1,21 +1,18 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IniFile {
     path: String,
 }
 
 impl IniFile {
-    pub const fn new() -> Self{
-        Self {
-            path: String::new(),
-        }
-    }
-    pub fn set_path(&mut self, path: &str) {
+    pub fn new(path: &str) -> Self{
         let p = std::path::Path::new(path);
         if !p.exists() || p.exists() && p.is_dir() {
             let p = crate::rust_lib::main_mod::set_file(path, String::new());
             if !p { panic!("无法创建INI文件！") }
         }
-        self.path = path.to_string();
+        Self {
+            path: path.to_string(),
+        }
     }
     pub fn read_int(&self, section: &str, key: &str, default: i32) -> i32 {
         let re = ini::Ini::load_from_file(self.path.as_str());

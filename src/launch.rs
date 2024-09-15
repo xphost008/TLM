@@ -125,7 +125,7 @@ fn java_search_regedit() -> bool {
 }
 
 fn simple_scan_java() {
-    let binding = crate::main_method::APP_DATA.with_borrow(|e| e.clone());
+    let binding = crate::main_method::APP_DATA.get().expect("Cannot get AppData Value");
     let appdata_path = std::path::Path::new(binding.as_str());
     let appdata_path = appdata_path.parent().expect("Cannot get appdata parent path!");
     let appdata_path = appdata_path.join("Local");
@@ -250,7 +250,7 @@ pub fn choose_java() {
         }
         let input_num = input_num - 1;
         CHOOSE_JAVA.set(input_num as i32);
-        crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Java", "SelectJava", input_num.to_string().as_str()));
+        crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Java", "SelectJava", input_num.to_string().as_str());
         let current = java_obj[input_num].as_object().unwrap();
         CURRENT_JAVA.set(current["path"].as_str().unwrap().to_string());
         CURRENT_BITS.set(current["bits"].as_str().unwrap().to_string());
@@ -302,7 +302,7 @@ pub fn remove_java() {
             CURRENT_BITS.set(String::new());
             CURRENT_VERSION.set(String::new());
         }
-        crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Java", "SelectJava", CHOOSE_JAVA.with_borrow(|e| e.clone()).to_string().as_str()));
+        crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Java", "SelectJava", CHOOSE_JAVA.with_borrow(|e| e.clone()).to_string().as_str());
         java_obj.remove(input_num);
     });
     save_launch();
@@ -336,7 +336,7 @@ pub fn set_additional_jvm() {
     std::io::stdin().read_line(&mut input_str).expect("Cannot read number!");
     let input_str = input_str.trim().to_string();
     ADDITIONAL_JVM.set(input_str.clone());
-    crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Version", "AdditionalJVM", input_str.as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Version", "AdditionalJVM", input_str.as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -346,7 +346,7 @@ pub fn set_additional_game() {
     std::io::stdin().read_line(&mut input_str).expect("Cannot read number!");
     let input_str = input_str.trim().to_string();
     ADDITIONAL_GAME.set(input_str.clone());
-    crate::main_method::TLM_INI.with_borrow(move |e| e.write_str("Version", "AdditionalGame", input_str.as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Version", "AdditionalGame", input_str.as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -360,7 +360,7 @@ pub fn set_custom_info() {
         return;
     }
     CUSTOM_INFO.set(input_str.clone());
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Version", "CustomInfo", input_str.as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Version", "CustomInfo", input_str.as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -375,7 +375,7 @@ pub fn set_window_height() {
     }
     let input_num = input_num.unwrap();
     WINDOW_HEIGHT.set(input_num);
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "WindowHeight", input_num.to_string().as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Document", "WindowHeight", input_num.to_string().as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -391,7 +391,7 @@ pub fn set_window_width() {
     }
     let input_num = input_num.unwrap();
     WINDOW_WIDTH.set(input_num);
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "WindowHeight", input_num.to_string().as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Document", "WindowHeight", input_num.to_string().as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -406,7 +406,7 @@ pub fn set_max_memory() {
     }
     let input_num = input_num.unwrap();
     MAX_MEMORY.set(input_num);
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "MaxMemory", input_num.to_string().as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Document", "MaxMemory", input_num.to_string().as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
@@ -421,13 +421,13 @@ pub fn set_min_memory() {
     }
     let input_num = input_num.unwrap();
     MIN_MEMORY.set(input_num);
-    crate::main_method::TLM_INI.with_borrow(|e| e.write_str("Document", "MinMemory", input_num.to_string().as_str()));
+    crate::main_method::TLM_INI.get().expect("Cannot read TLM ini Value").write_str("Document", "MinMemory", input_num.to_string().as_str());
     println!("{}", ansi_term::Color::Green.paint("设置成功！"));
 }
 
 fn save_launch() {
     let java_json = JAVA_JSON.with_borrow(|e| e.clone());
     crate::rust_lib::main_mod::set_file(
-        format!("{}\\TankLauncherModule\\configs\\JavaJSON.json", crate::main_method::CURRENT_DIR.with_borrow(|e| e.clone())).as_str(), 
+        format!("{}\\TankLauncherModule\\configs\\JavaJSON.json", crate::main_method::CURRENT_DIR.get().expect("Cannot read Current Dir Value")).as_str(), 
         serde_json::to_string_pretty(&java_json.clone()).unwrap());
 }
